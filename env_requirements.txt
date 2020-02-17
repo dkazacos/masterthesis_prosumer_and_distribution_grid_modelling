@@ -1,0 +1,6 @@
+# At the time of writing
+
+# python == 3.6
+# pandapower == 2.2.0
+# pandas == 0.25.3
+# numpy == 1.18.1
