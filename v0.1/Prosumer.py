@@ -29,7 +29,7 @@ class BatterySimple(object):
         self.signal     = signal            # resembles signals from outside
     
     def get_soc(self):
-        if self.state == None:
+        if len(self.meta['SOC']) == 0:
             return 100
         else:
             return self.meta['SOC'][-1]
