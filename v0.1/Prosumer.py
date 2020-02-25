@@ -56,7 +56,7 @@ class BatterySimple(object):
     def get_state(self):
         return self.state
     
-    def get_data(self):
+    def get_battery_data(self):
         return pd.DataFrame(self.meta)
     
     def get_capacity(self):
@@ -142,7 +142,7 @@ class BatterySimple(object):
             self.meta['log'].append('No power flow through battery')
             
 
-class cpu(object):
+class CPU(object):
     
     """
     Documentation
@@ -176,7 +176,7 @@ class cpu(object):
                            'log'                : [],
                            }
     
-    def get_data(self):
+    def get_cpu_data(self):
         return pd.DataFrame(self.meta)
     
     def get_battery_meta(self):
@@ -296,7 +296,7 @@ class PVgen(object):
     def get_sys_loss(self):
         return self.total_loss
     
-    def get_data(self):
+    def get_pv_data(self):
         return pd.DataFrame(self.meta)
     
     def production(self, irr_sol):
@@ -323,7 +323,7 @@ class PVgen(object):
         else:
             return p_sun
 
-class Prosumer(object):
+class Prosumer(BatterySimple, CPU, PVgen):
     
     """
     """
@@ -331,7 +331,8 @@ class Prosumer(object):
     def __init__(self, irrad_data=None, load_demand=None):
         self.irrad_data = irrad_data
         self.load_demand = load_demand
-        self.cpu = cpu()
+        self.battery = BatterySimple()
+        self.cpu = CPU()
         self.pv_gen = PVgen()
 
     def get_irrad_data(self):
@@ -341,7 +342,7 @@ class Prosumer(object):
         return self.load_demand
 
     def get_battery_capacity(self):
-        return self.batt_capacity
+        return self.battery.get_capacity()
 
     def active(self, signal):
         """
