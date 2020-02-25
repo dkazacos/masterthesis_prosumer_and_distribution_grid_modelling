@@ -10,17 +10,34 @@ import math
 from utils.function_repo import timegrid
 
 class BatterySimple(object):
-    
+    """
+    Linear behavior of charge and discharge of a battery. No
+    physical process is considered in this model. Battery has
+    a capacity that dictates power In/Out behavior
+
+    Parameters
+    ----------
+    p_kw : float, default None
+        power flow that charges or discharges battery in kW
+
+    capacity : float, default 7.5
+        capacity of the battery in kWh
+
+    meta : dict, default None
+        dictionary containing process data
+
+    signal : str, default None
+        place-holder for external control signals
+
+    Returns
+    ----------
+
+    """
+
     state = 'Fully charged'
     
     def __init__(self, p_kw=None, capacity=7.5, meta=None, signal=None):
-        
-        """
-        Linear behavior of charge and discharge of a battery. No
-        physical process is considered in this model. Battery has
-        a capacity that dictates power In/Out behavior
-        """
-        
+
         self.p_kw       = p_kw                  # power exchange [kW] (< 0 charging)
         self.capacity   = capacity              # capacity of battery [kWh]
         self.meta       = {'P'          : [],   # dictionary of data
