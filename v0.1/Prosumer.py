@@ -7,7 +7,7 @@ Created on Sat Feb  1 16:11:55 2020
 
 import pandas as pd
 import math
-from utils.function_repo import timegrid
+# from utils.function_repo import timegrid
 
 class BatterySimple(object):
     """
@@ -328,12 +328,52 @@ class Prosumer(BatterySimple, CPU, PVgen):
     """
     """
     
-    def __init__(self, irrad_data=None, load_demand=None):
-        self.irrad_data = irrad_data
-        self.load_demand = load_demand
-        self.battery = BatterySimple()
-        self.cpu = CPU()
-        self.pv_gen = PVgen()
+    def __init__(self,
+                 irrad_data     = None,
+                 load_demand    = None,
+                 pv_kw          = None,
+                 num_panels     = None,
+                 panel_peak_p   = 0.3,
+                 pv_eff         = 0.18,
+                 roof_area      = None,
+                 total_loss     = 0.0035,
+                 module_area    = 1.96,
+                 oda_t          = None,
+                 p_pv           = None,
+                 p_load         = None,
+                 p_kw           = None,
+                 capacity       = 7.5,
+                 signal         = None,
+                 ):
+
+        self.irrad_data     = irrad_data
+        self.load_demand    = load_demand
+        self.pv_kw          = pv_kw
+        self.num_panels     = num_panels
+        self.panel_peak_p   = panel_peak_p
+        self.pv_eff         = pv_eff
+        self.roof_area      = roof_area
+        self.total_loss     = total_loss
+        self.module_area    = module_area
+        self.oda_t          = oda_t
+        self.p_pv           = p_pv
+        self.p_load         = p_load
+        self.p_kw           = p_kw
+        self.capacity       = capacity
+        self.signal         = signal
+        self.battery        = BatterySimple(p_kw=self.p_kw,
+                                            capacity=self.capacity,
+                                            signal=self.signal)
+        self.cpu            = CPU(p_pv=self.p_pv,
+                                  p_load=self.p_load)
+        self.pv_gen         = PVgen(pv_kw=self.pv_kw,
+                                    num_panels=self.num_panels,
+                                    panel_peak_p=self.panel_peak_p,
+                                    pv_eff=self.pv_eff,
+                                    roof_area=self.roof_area,
+                                    total_loss=self.total_loss,
+                                    module_area=self.module_area,
+                                    oda_t=self.oda_t)
 
     def get_irrad_data(self):
         return self.irrad_data
