@@ -7,7 +7,8 @@ Created on Sat Feb  1 16:11:55 2020
 
 import pandas as pd
 import math
-# from utils.function_repo import timegrid
+import sys
+from utils.function_repo import timegrid
 
 class BatterySimple(object):
     """
@@ -47,19 +48,19 @@ class BatterySimple(object):
                            }     
         self.signal     = signal            # resembles signals from outside
     
-    def get_soc(self):
+    def get_battery_soc(self):
         if len(self.meta['SOC']) == 0:
             return 100
         else:
             return self.meta['SOC'][-1]
     
-    def get_state(self):
+    def get_battery_state(self):
         return self.state
     
     def get_battery_data(self):
         return pd.DataFrame(self.meta)
     
-    def get_capacity(self):
+    def get_battery_capacity(self):
         return self.capacity
     
     def bms(self):
@@ -140,99 +141,6 @@ class BatterySimple(object):
                     self.meta['SOC'].append(self.meta['SOC'][-1])
             self.meta['P'].append(p)
             self.meta['log'].append('No power flow through battery')
-            
-
-class CPU(object):
-    
-    """
-    Control unit for power flow from/to the battery and from/to the grid
-
-    Parameters
-    ----------
-    p_pv : float, default None
-        power output of PV installation at a given timestamp
-
-    p_load : float, default None
-        power requirements of prosumer at a given timestamp
-
-    b_type : str, default 'linear'
-        type of battery to be used by the simulation. 
-        'linear' battery is an instance of BatterySimple class.
-        'phys' battery is an instance of a more advanced physical model of a
-        battery. An instance of the class Battery from Storage.py module
-
-    switch_b : int, default None
-        switch that bypasses the battery. 0 or 1 for closed or opened
-
-    switch_pv : int, default None
-        switch that bypasses the PV installation. 0 or 1 for closed or opened
-
-    Return
-    ----------
-
-    """
-    
-    signal   = 'self-consumption'   # also: 'grid high voltage', 'reactive feed-in'
-    strategy = 'pv-priority'        # also: 'grid-friendly', 'cooperative'
-
-    def __init__(self, p_pv=None, p_load=None, b_type='linear', switch_b=None, switch_pv=None):
-
-        self.p_pv       = p_pv
-        self.p_load     = p_load
-        self.b_type     = b_type
-        if self.b_type == "linear":
-            self.battery = BatterySimple()
-        # elif self.b_type == "phys":
-        #     self.battery = Battery()
-        self.switch_b   = switch_b
-        self.switch_pv  = switch_pv
-        self.meta       = {'p_load'             : [],
-                           'p_pv'               : [],
-                           'p_battery_flow'     : [],
-                           'p_grid_flow'        : [],
-                           'battery_status'     : [],
-                           'grid_status'        : [],
-                           'log'                : [],
-                           }
-    
-    def get_cpu_data(self):
-        return pd.DataFrame(self.meta)
-    
-    def get_battery_meta(self):
-        return self.battery.meta
-    
-    def get_battery_data(self):
-        return self.battery.get_data()
-    
-    def get_battery_soc(self):
-        return self.battery.get_soc()
-    
-    def control(self, p_pv, p_load, timestep):
-        
-        self.meta['p_pv'].append(p_pv)
-        self.meta['p_load'].append(p_load)
-        p_flow = p_load - p_pv
-
-        self.battery.process(p_flow, timestep)
-        self.meta['p_grid_flow'].append(self.battery.meta['p_reject'][-1])
-        self.meta['p_battery_flow'].append(self.battery.meta['P'][-1])
-                
-        if p_flow > 0 and self.battery.meta['p_reject'][-1] < 0:
-            self.meta['grid_status'].append(-1)
-            self.meta['battery_status'].append(-1)
-            self.meta['log'].append('discharge of battery and supply from grid')
-        elif p_flow > 0 and self.battery.meta['p_reject'][-1] == 0:
-            self.meta['grid_status'].append(0)
-            self.meta['battery_status'].append(-1)
-            self.meta['log'].append('demand satisfied by battery. No grid flow')
-        elif p_flow < 0 and self.battery.meta['p_reject'][-1] > 0:
-            self.meta['grid_status'].append(1)
-            self.meta['battery_status'].append(1)
-            self.meta['log'].append('charge of battery and grid feed-in')
-        elif p_flow < 0 and self.battery.meta['p_reject'][-1] == 0:
-            self.meta['grid_status'].append(0)
-            self.meta['battery_status'].append(1)
-            self.meta['log'].append('surplus absorbed by battery. No grid flow')
 
 class PVgen(object):
     
@@ -295,7 +203,7 @@ class PVgen(object):
                                # 'oda_t'    : [],
                                }
 
-    def get_installed_power(self):
+    def get_installed_pv(self):
         
         if self.pv_kw:
             return self.pv_kw
@@ -308,7 +216,7 @@ class PVgen(object):
         else:
             return 'Missing args: see documentation. Need pv_kw, num_panels or roof_area'
     
-    def get_sys_loss(self):
+    def get_pv_sys_loss(self):
         return self.total_loss
     
     def get_pv_data(self):
@@ -336,9 +244,101 @@ class PVgen(object):
         if p_sun > self.get_installed_power():
             return self.get_installed_power() * self.total_loss
         else:
-            return p_sun
+            return p_sun   
 
-class Prosumer(BatterySimple, CPU, PVgen):
+class CPU(BatterySimple, PVgen):
+    
+    """
+    Control unit for power flow from/to the battery and from/to the grid
+
+    Parameters
+    ----------
+    p_pv : float, default None
+        power output of PV installation at a given timestamp
+
+    p_load : float, default None
+        power requirements of prosumer at a given timestamp
+
+    b_type : str, default 'linear'
+        type of battery to be used by the simulation. 
+        'linear' battery is an instance of BatterySimple class.
+        'phys' battery is an instance of a more advanced physical model of a
+        battery. An instance of the class Battery from Storage.py module
+
+    switch_b : int, default None
+        switch that bypasses the battery. 0 or 1 for closed or opened
+
+    switch_pv : int, default None
+        switch that bypasses the PV installation. 0 or 1 for closed or opened
+
+    Return
+    ----------
+
+    """
+    
+    signal   = 'self-consumption'   # also: 'grid high voltage', 'reactive feed-in'
+    strategy = 'pv-priority'        # also: 'grid-friendly', 'cooperative'
+
+    def __init__(self, p_pv=None, p_load=None, b_type='linear', switch_b=None, switch_pv=None):
+
+        self.p_pv       = p_pv
+        self.p_load     = p_load
+        self.b_type     = b_type
+        if self.b_type == "linear":
+            self.battery = BatterySimple()
+        # elif self.b_type == "phys":
+        #     self.battery = Battery()
+        self.switch_b   = switch_b
+        self.switch_pv  = switch_pv
+        self.meta       = {'p_load'             : [],
+                           'p_pv'               : [],
+                           'p_battery_flow'     : [],
+                           'p_grid_flow'        : [],
+                           'battery_status'     : [],
+                           'grid_status'        : [],
+                           'log'                : [],
+                           }
+    
+    def get_cpu_data(self):
+        return pd.DataFrame(self.meta)
+    
+    # def get_battery_meta(self):
+    #     return self.battery.meta
+    
+    # def get_battery_data(self):
+    #     return self.battery.get_battery_data()
+    
+    # def get_battery_soc(self):
+    #     return self.battery.get_soc()
+    
+    def control(self, p_pv, p_load, timestep):
+        
+        self.meta['p_pv'].append(p_pv)
+        self.meta['p_load'].append(p_load)
+        p_flow = p_load - p_pv
+
+        self.battery.process(p_flow, timestep)
+        self.meta['p_grid_flow'].append(self.battery.meta['p_reject'][-1])
+        self.meta['p_battery_flow'].append(self.battery.meta['P'][-1])
+                
+        if p_flow > 0 and self.battery.meta['p_reject'][-1] < 0:
+            self.meta['grid_status'].append(-1)
+            self.meta['battery_status'].append(-1)
+            self.meta['log'].append('discharge of battery and supply from grid')
+        elif p_flow > 0 and self.battery.meta['p_reject'][-1] == 0:
+            self.meta['grid_status'].append(0)
+            self.meta['battery_status'].append(-1)
+            self.meta['log'].append('demand satisfied by battery. No grid flow')
+        elif p_flow < 0 and self.battery.meta['p_reject'][-1] > 0:
+            self.meta['grid_status'].append(1)
+            self.meta['battery_status'].append(1)
+            self.meta['log'].append('charge of battery and grid feed-in')
+        elif p_flow < 0 and self.battery.meta['p_reject'][-1] == 0:
+            self.meta['grid_status'].append(0)
+            self.meta['battery_status'].append(1)
+            self.meta['log'].append('surplus absorbed by battery. No grid flow')
+
+class Prosumer(BatterySimple, PVgen, CPU):
     
     """
     """
