@@ -7,7 +7,7 @@ Created on Sat Feb  1 16:11:55 2020
 
 import pandas as pd
 import math
-import sys
+# import sys
 from utils.function_repo import timegrid
 
 class BatterySimple(object):
@@ -301,16 +301,7 @@ class CPU(BatterySimple, PVgen):
     
     def get_cpu_data(self):
         return pd.DataFrame(self.meta)
-    
-    # def get_battery_meta(self):
-    #     return self.battery.meta
-    
-    # def get_battery_data(self):
-    #     return self.battery.get_battery_data()
-    
-    # def get_battery_soc(self):
-    #     return self.battery.get_soc()
-    
+  
     def control(self, p_pv, p_load, timestep):
         
         self.meta['p_pv'].append(p_pv)
@@ -338,7 +329,7 @@ class CPU(BatterySimple, PVgen):
             self.meta['battery_status'].append(1)
             self.meta['log'].append('surplus absorbed by battery. No grid flow')
 
-class Prosumer(BatterySimple, PVgen, CPU):
+class Prosumer(CPU):
     
     """
     """
@@ -395,9 +386,6 @@ class Prosumer(BatterySimple, PVgen, CPU):
 
     def get_load_demand(self):
         return self.load_demand
-
-    def get_battery_capacity(self):
-        return self.battery.get_capacity()
 
     def active(self, signal):
         """
