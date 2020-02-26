@@ -209,10 +209,6 @@ class CPU(object):
     
     def control(self, p_pv, p_load, timestep):
         
-        """
-        Documentation
-        """
-        
         self.meta['p_pv'].append(p_pv)
         self.meta['p_load'].append(p_load)
         p_flow = p_load - p_pv
