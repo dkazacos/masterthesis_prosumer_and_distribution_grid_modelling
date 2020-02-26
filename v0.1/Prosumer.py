@@ -145,19 +145,38 @@ class BatterySimple(object):
 class CPU(object):
     
     """
-    Documentation
-    
+    Control unit for power flow from/to the battery and from/to the grid
+
+    Parameters
+    ----------
+    p_pv : float, default None
+        power output of PV installation at a given timestamp
+
+    p_load : float, default None
+        power requirements of prosumer at a given timestamp
+
+    b_type : str, default 'linear'
+        type of battery to be used by the simulation. 
+        'linear' battery is an instance of BatterySimple class.
+        'phys' battery is an instance of a more advanced physical model of a
+        battery. An instance of the class Battery from Storage.py module
+
+    switch_b : int, default None
+        switch that bypasses the battery. 0 or 1 for closed or opened
+
+    switch_pv : int, default None
+        switch that bypasses the PV installation. 0 or 1 for closed or opened
+
+    Return
+    ----------
+
     """
     
     signal   = 'self-consumption'   # also: 'grid high voltage', 'reactive feed-in'
     strategy = 'pv-priority'        # also: 'grid-friendly', 'cooperative'
 
     def __init__(self, p_pv=None, p_load=None, b_type='linear', switch_b=None, switch_pv=None):
-        
-        """
-        Documentation
-        """
-        
+
         self.p_pv       = p_pv
         self.p_load     = p_load
         self.b_type     = b_type
