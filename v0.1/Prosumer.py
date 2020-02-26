@@ -241,8 +241,8 @@ class PVgen(object):
 
         p_sun = irr_sol * self.module_area / 1000
         
-        if p_sun > self.get_installed_power():
-            return self.get_installed_power() * self.total_loss
+        if p_sun > self.get_installed_pv():
+            return self.get_installed_pv() * self.total_loss
         else:
             return p_sun   
 
@@ -372,7 +372,7 @@ class Prosumer(CPU):
                                             signal=self.signal)
         self.cpu            = CPU(p_pv=self.p_pv,
                                   p_load=self.p_load)
-        self.pv_gen         = PVgen(pv_kw=self.pv_kw,
+        self.pvgen          = PVgen(pv_kw=self.pv_kw,
                                     num_panels=self.num_panels,
                                     panel_peak_p=self.panel_peak_p,
                                     pv_eff=self.pv_eff,
@@ -392,13 +392,13 @@ class Prosumer(CPU):
         """
 
         timestep    = timegrid(self.irrad_data)
-        p_pv        = self.irrad_data
-        p_load      = self.load_demand
         i, j        = 0
-
-        while signal=='green':
-            self.cpu.signal = signal
-            self.cpu.control(p_pv.iloc[i, 0], p_load.iloc[j, 0], timestep)
-
+        while signal=='self-consumption':
+            p_pv    = self.pvgen.production(self.irrad_data.iloc[i, 0])
+            p_load  = self.load_demand.iloc[j, 0]
+            self.cpu.control(p_pv, p_load, timestep)
             i += 1
             j += 1
+            # TODO! introduce logic for variation of signals
+            if i > len(self.irrad_data) or j > len(self.load_demand):
+                break
