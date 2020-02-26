@@ -12,9 +12,14 @@ def timegrid(data):
     Extracts time step (in seconds) from the time grid property of data.
     Data must be pandas DataFrame or Series
     """
-    if data.p_load.index.dtype == object:
-        data.p_load.index = pd.to_datetime(data.p_load.index)
-        return (data.p_load.index[1] - data.p_load.index[0]) // pd.Timedelta('1s')
-    
-    elif data.p_kw.index.dtype != object:
-        return (data.p_load.index[1] - data.p_load.index[0]) // pd.Timedelta('1s')
+    tg = data.index
+    if any('24:' in string for string in data.index.tolist()):
+            data.index=data.index.str.replace('24:','00:')
+            tg=tg.str.replace('24:', '00:')
+
+    if data.index.dtype == object:
+        tg = pd.to_datetime(tg)
+        return (tg[1] - tg[0]) // pd.Timedelta('1s')
+
+    elif tg.dtype != object:
+        return (tg[1] - tg[0]) // pd.Timedelta('1s')
