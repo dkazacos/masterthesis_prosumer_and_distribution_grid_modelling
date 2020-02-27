@@ -7,7 +7,9 @@ Created on Sat Feb  1 16:11:55 2020
 
 import pandas as pd
 import math
-# import sys
+import decimal
+import sys
+sys.path.append('..')
 from utils.function_repo import timegrid
 
 class BatterySimple(object):
@@ -168,6 +170,7 @@ class PVgen(object):
         total loss due to cable transmission
 
     module_area : float, default 1.96 m2
+        area of a single solar panel
 
     oda_t : float, default None
         outdoor air temperature data. Power output dependency on outdoor
@@ -202,19 +205,30 @@ class PVgen(object):
         self.meta           = {'irr_sol'  : [],
                                # 'oda_t'    : [],
                                }
-
-    def get_installed_pv(self):
+        if not self.pv_kw:
+            if self.num_panels:
+                self.pv_kw = self.num_panels * self.panel_peak_p
+                if self.roof_area:
+                    if self.num_panels * self.module_area > math.floor(self.roof_area / self.module_area):
+                        raise AttributeError('Invalid number of panels: %s. Won´t fit in roof area: %s m2 for a module area of %s m2' % (self.num_panels, self.roof_area, self.module_area))
+            elif self.roof_area and not self.num_panels:
+                self.num_panels = math.floor(self.roof_area / self.module_area)
+                self.pv_kw = self.num_panels * self.panel_peak_p
+            else:
+                print('Missing args: see documentation. Need pv_kw, num_panels or roof_area')
+        elif self.pv_kw and not self.num_panels:
+            if self.roof_area:
+                if self.pv_kw / self.panel_peak_p * self.module_area > self.roof_area:
+                    raise AttributeError('Invalid PV installed power. Not enough roof area for given module characteritics to yield %s kW. Reduce PV installed power or increase roof area' % self.pv_kw)
+            if decimal.Decimal('%s' % self.pv_kw) % decimal.Decimal('%s' % self.panel_peak_p) != 0:
+                self.num_panels = math.ceil(self.pv_kw / self.panel_peak_p)
+                self.pv_kw = self.num_panels * self.panel_peak_p
+                raise Warning('Module characteristics require chosen PV installed power to be adjusted to %s kW. See class default args' % self.pv_kw)
+            else:
+                self.num_panels = self.pv_kw / self.panel_peak_p
         
-        if self.pv_kw:
-            return self.pv_kw
-        elif self.num_panels:
-            return self.num_panels*self.panel_peak_p
-        elif self.roof_area:
-            num_panels = math.floor(self.roof_area/self.module_area)
-            self.num_panels = num_panels
-            return num_panels * self.panel_peak_p
-        else:
-            return 'Missing args: see documentation. Need pv_kw, num_panels or roof_area'
+    def get_installed_pv(self):
+        return self.pv_kw
     
     def get_pv_sys_loss(self):
         return self.total_loss
@@ -238,13 +252,13 @@ class PVgen(object):
             Power generation from PV installation at a given timestamp
 
         """
-
-        p_sun = irr_sol * self.module_area / 1000
-        
-        if p_sun > self.get_installed_pv():
+        tg = timegrid(irr_sol)
+        p_sun_wh = irr_sol * self.module_area * self.num_panels
+        p_sun_kw = p_sun_wh / tg  * 3.6
+        if p_sun_kw > self.get_installed_pv():
             return self.get_installed_pv() * self.total_loss
         else:
-            return p_sun
+            return p_sun_kw * self.total_loss
 
 class CPU(BatterySimple, PVgen):
     
@@ -394,7 +408,7 @@ class Prosumer(CPU):
         timestep    = timegrid(self.irrad_data)
         i, j        = 0
         while signal=='self-consumption':
-            p_pv    = self.pvgen.production(self.irrad_data.iloc[i, 0])
+            p_pv    = self.pvgen.production(self.irrad_data.iloc[i, 0]) # TODO! migrate to CPU
             p_load  = self.load_demand.iloc[j, 0]
             self.cpu.control(p_pv, p_load, timestep)
             i += 1
