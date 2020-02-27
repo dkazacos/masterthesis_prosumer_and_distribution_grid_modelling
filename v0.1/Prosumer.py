@@ -544,7 +544,7 @@ if __name__ == "__main__":
     # ========================================================================
     # Test model and get results
     p       = Prosumer(
-                       pv_kw            =   2.1,
+                       pv_kw            = 2.1,
                        battery_capacity = 3.5,
                        load_demand      = load_demand,
                        )
@@ -565,5 +565,4 @@ if __name__ == "__main__":
     ax.xaxis.set_ticks(np.arange(start, end, 10))
     fig.autofmt_xdate()
     ax.legend()
-
-    fig.show()
+    plt.title('Power flow during 1st simulated day', fontsize=18)
