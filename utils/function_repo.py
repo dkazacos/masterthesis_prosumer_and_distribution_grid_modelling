@@ -13,11 +13,11 @@ def timegrid(data):
     Data must be pandas DataFrame or Series
     """
     tg = data.index
-    if any('24:' in string for string in data.index.tolist()):
-            data.index=data.index.str.replace('24:','00:')
-            tg=tg.str.replace('24:', '00:')
 
     if data.index.dtype == object:
+        if any('24:' in string for string in data.index.tolist()):
+            data.index=data.index.str.replace('24:','00:')
+            tg=tg.str.replace('24:', '00:')
         tg = pd.to_datetime(tg)
         return (tg[1] - tg[0]) // pd.Timedelta('1s')
 
