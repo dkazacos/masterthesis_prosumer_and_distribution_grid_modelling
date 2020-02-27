@@ -86,7 +86,7 @@ class BatterySimple(object):
         """
         self.p_kw   = p_kw
         h           = timestep/3600
-        st          = self.get_state()
+        st          = self.get_battery_state()
         p           = self.bms()
         c           = self.capacity
         
@@ -192,14 +192,14 @@ class PVgen(object):
         production() method
     """
 
-    def __init__(self, pv_kw = None, num_panels=None, panel_peak_p=0.3, pv_eff=0.18, roof_area=None, total_loss=0.0035, module_area=1.96, oda_t=None):
+    def __init__(self, pv_kw = None, num_panels=None, panel_peak_p=0.3, pv_eff=0.18, roof_area=None, pv_total_loss=0.0035, module_area=1.96, oda_t=None):
 
         self.pv_kw          = pv_kw
         self.num_panels     = num_panels
         self.panel_peak_p   = panel_peak_p
         self.pv_eff         = pv_eff
         self.roof_area      = roof_area
-        self.total_loss     = total_loss
+        self.pv_total_loss  = pv_total_loss
         self.module_area    = module_area
         self.oda_t          = oda_t
         self.meta           = {'irr_sol'  : [],
@@ -210,20 +210,20 @@ class PVgen(object):
                 self.pv_kw = self.num_panels * self.panel_peak_p
                 if self.roof_area:
                     if self.num_panels * self.module_area > math.floor(self.roof_area / self.module_area):
-                        raise AttributeError('Invalid number of panels: %s. Won´t fit in roof area: %s m2 for a module area of %s m2' % (self.num_panels, self.roof_area, self.module_area))
+                        raise AttributeError('Invalid number of PVgen panels: %s. Won´t fit in roof area: %s m2 for a module area of %s m2' % (self.num_panels, self.roof_area, self.module_area))
             elif self.roof_area and not self.num_panels:
                 self.num_panels = math.floor(self.roof_area / self.module_area)
                 self.pv_kw = self.num_panels * self.panel_peak_p
             else:
-                print('Missing args: see documentation. Need pv_kw, num_panels or roof_area')
+                print('Missing args: see PVgen class documentation. Need pv_kw, num_panels or roof_area')
         elif self.pv_kw and not self.num_panels:
             if self.roof_area:
                 if self.pv_kw / self.panel_peak_p * self.module_area > self.roof_area:
-                    raise AttributeError('Invalid PV installed power. Not enough roof area for given module characteritics to yield %s kW. Reduce PV installed power or increase roof area' % self.pv_kw)
+                    raise AttributeError('Invalid PVgen installed power. Not enough roof area for given module characteritics to yield %s kW. Reduce PV installed power or increase roof area' % self.pv_kw)
             if decimal.Decimal('%s' % self.pv_kw) % decimal.Decimal('%s' % self.panel_peak_p) != 0:
                 self.num_panels = math.ceil(self.pv_kw / self.panel_peak_p)
                 self.pv_kw = self.num_panels * self.panel_peak_p
-                raise Warning('Module characteristics require chosen PV installed power to be adjusted to %s kW. See class default args' % self.pv_kw)
+                raise Warning('Module characteristics require chosen PVgen installed power to be adjusted to %s kW. See class default args' % self.pv_kw)
             else:
                 self.num_panels = self.pv_kw / self.panel_peak_p
         
@@ -231,12 +231,12 @@ class PVgen(object):
         return self.pv_kw
     
     def get_pv_sys_loss(self):
-        return self.total_loss
+        return self.pv_total_loss
     
     def get_pv_data(self):
         return pd.DataFrame(self.meta)
     
-    def production(self, irr_sol):
+    def production(self, irr_sol, timestep):
         """
 
         Parameters
@@ -252,13 +252,12 @@ class PVgen(object):
             Power generation from PV installation at a given timestamp
 
         """
-        tg = timegrid(irr_sol)
         p_sun_wh = irr_sol * self.module_area * self.num_panels
-        p_sun_kw = p_sun_wh / tg  * 3.6
+        p_sun_kw = p_sun_wh / timestep * 3.6
         if p_sun_kw > self.get_installed_pv():
-            return self.get_installed_pv() * self.total_loss
+            return self.get_installed_pv() * (1. - self.pv_total_loss)
         else:
-            return p_sun_kw * self.total_loss
+            return p_sun_kw * (1. - self.pv_total_loss)
 
 class CPU(BatterySimple, PVgen):
     
@@ -293,23 +292,61 @@ class CPU(BatterySimple, PVgen):
     signal   = 'self-consumption'   # also: 'grid high voltage', 'reactive feed-in'
     strategy = 'pv-priority'        # also: 'grid-friendly', 'cooperative'
 
-    def __init__(self, p_pv=None, p_load=None, b_type='linear', switch_b=None, switch_pv=None):
+    def __init__(self,
+                 p_pv           = None,
+                 p_load         = None,
+                 b_type         = 'linear',
+                 switch_b       = None,
+                 switch_pv      = None,
+                 p_kw           = None,
+                 capacity       = 7.5,
+                 signal         = None,
+                 pv_kw          = None,
+                 num_panels     = None,
+                 panel_peak_p   = 0.3,
+                 pv_eff         = 0.18,
+                 roof_area      = None,
+                 pv_total_loss  = 0.0035,
+                 module_area    = 1.96,
+                 oda_t          = None,
+                 ):
 
-        self.p_pv       = p_pv
-        self.p_load     = p_load
-        self.b_type     = b_type
+        self.p_pv           = p_pv
+        self.p_load         = p_load
+        self.b_type         = b_type
+        self.switch_b       = switch_b
+        self.switch_pv      = switch_pv
+        self.p_kw           = p_kw
+        self.capacity       = capacity
+        self.signal         = signal
+        self.pv_kw          = pv_kw
+        self.num_panels     = num_panels
+        self.panel_peak_p   = panel_peak_p
+        self.pv_eff         = pv_eff
+        self.roof_area      = roof_area
+        self.pv_total_loss  = pv_total_loss
+        self.module_area    = module_area
+        self.oda_t          = oda_t
         if self.b_type == "linear":
-            self.battery = BatterySimple()
+            self.battery = BatterySimple(p_kw=self.p_kw,
+                                         capacity=self.capacity,
+                                         signal=self.signal)
         # elif self.b_type == "phys":
         #     self.battery = Battery()
-        self.pvgen      = PVgen()
-        self.switch_b   = switch_b
-        self.switch_pv  = switch_pv
+        self.pvgen      = PVgen(pv_kw=self.pv_kw,
+                                num_panels=self.num_panels,
+                                panel_peak_p=self.panel_peak_p,
+                                pv_eff=self.pv_eff,
+                                roof_area=self.roof_area,
+                                pv_total_loss=self.pv_total_loss,
+                                module_area=self.module_area,
+                                oda_t=self.oda_t)
         self.meta       = {'p_load'             : [],
                            'p_pv'               : [],
                            'p_battery_flow'     : [],
-                           'p_grid_flow'        : [],
+                           'battery_SOC'        : [],
                            'battery_status'     : [],
+                           'p_grid_flow'        : [],
                            'grid_status'        : [],
                            'log'                : [],
                            }
@@ -317,29 +354,38 @@ class CPU(BatterySimple, PVgen):
     def get_cpu_data(self):
         return pd.DataFrame(self.meta)
   
-    def control(self, p_pv, p_load, timestep):
+    def control(self, irr_sun, p_load, timestep):
         
+        p_pv    = self.pvgen.production(irr_sun, timestep)
+        p_flow  = p_load - p_pv
+        self.battery.process(p_flow, timestep)
         self.meta['p_pv'].append(p_pv)
         self.meta['p_load'].append(p_load)
-        p_flow = p_load - p_pv
-
-        self.battery.process(p_flow, timestep)
         self.meta['p_grid_flow'].append(self.battery.meta['p_reject'][-1])
         self.meta['p_battery_flow'].append(self.battery.meta['P'][-1])
-                
-        if p_flow > 0 and self.battery.meta['p_reject'][-1] < 0:
+        self.meta['battery_SOC'].append(self.battery.meta['SOC'][-1])
+
+        if p_flow > 0 and self.battery.meta['p_reject'][-1] < 0: # battery rejects discharging
             self.meta['grid_status'].append(-1)
-            self.meta['battery_status'].append(-1)
-            self.meta['log'].append('discharge of battery and supply from grid')
-        elif p_flow > 0 and self.battery.meta['p_reject'][-1] == 0:
+            if self.meta['p_battery_flow'][-1] == 0:
+                self.meta['battery_status'].append(0)
+                self.meta['log'].append('supply from grid')
+            else:
+                self.meta['battery_status'].append(-1)
+                self.meta['log'].append('battery discharge and supply from grid')
+        elif p_flow > 0 and self.battery.meta['p_reject'][-1] == 0: # battery accepts discharging
             self.meta['grid_status'].append(0)
             self.meta['battery_status'].append(-1)
             self.meta['log'].append('demand satisfied by battery. No grid flow')
-        elif p_flow < 0 and self.battery.meta['p_reject'][-1] > 0:
+        elif p_flow < 0 and self.battery.meta['p_reject'][-1] > 0: # battery rejects charging
             self.meta['grid_status'].append(1)
-            self.meta['battery_status'].append(1)
-            self.meta['log'].append('charge of battery and grid feed-in')
-        elif p_flow < 0 and self.battery.meta['p_reject'][-1] == 0:
+            if self.meta['p_battery_flow'][-1] == 0:
+                self.meta['battery_status'].append(0)
+                self.meta['log'].append('grid feed-in')
+            else:
+                self.meta['battery_status'].append(1)
+                self.meta['log'].append('battery charge and grid feed-in')
+        elif p_flow < 0 and self.battery.meta['p_reject'][-1] == 0: # battery accepts charging
             self.meta['grid_status'].append(0)
             self.meta['battery_status'].append(1)
             self.meta['log'].append('surplus absorbed by battery. No grid flow')
@@ -352,50 +398,61 @@ class Prosumer(CPU):
     def __init__(self,
                  irrad_data     = None,
                  load_demand    = None,
+                 p_pv           = None,
+                 p_load         = None,
+                 b_type         = 'linear',
+                 switch_b       = None,
+                 switch_pv      = None,
+                 p_kw           = None,
+                 capacity       = 7.5,
+                 signal         = None,
                  pv_kw          = None,
                  num_panels     = None,
                  panel_peak_p   = 0.3,
                  pv_eff         = 0.18,
                  roof_area      = None,
-                 total_loss     = 0.0035,
+                 pv_total_loss  = 0.0035,
                  module_area    = 1.96,
                  oda_t          = None,
-                 p_pv           = None,
-                 p_load         = None,
-                 p_kw           = None,
-                 capacity       = 7.5,
-                 signal         = None,
                  ):
 
+        self.irrad_data     = irrad_data
+        self.load_demand    = load_demand
+        self.p_pv           = p_pv
+        self.p_load         = p_load
+        self.b_type         = b_type
+        self.switch_b       = switch_b
+        self.switch_pv      = switch_pv
         self.p_kw           = p_kw
         self.capacity       = capacity
         self.signal         = signal
-        self.p_pv           = p_pv
-        self.p_load         = p_load
-        self.irrad_data     = irrad_data
-        self.load_demand    = load_demand
         self.pv_kw          = pv_kw
         self.num_panels     = num_panels
         self.panel_peak_p   = panel_peak_p
         self.pv_eff         = pv_eff
         self.roof_area      = roof_area
-        self.total_loss     = total_loss
+        self.pv_total_loss  = pv_total_loss
         self.module_area    = module_area
         self.oda_t          = oda_t
 
-        self.battery        = BatterySimple(p_kw=self.p_kw,
-                                            capacity=self.capacity,
-                                            signal=self.signal)
-        self.cpu            = CPU(p_pv=self.p_pv,
-                                  p_load=self.p_load)
-        self.pvgen          = PVgen(pv_kw=self.pv_kw,
-                                    num_panels=self.num_panels,
-                                    panel_peak_p=self.panel_peak_p,
-                                    pv_eff=self.pv_eff,
-                                    roof_area=self.roof_area,
-                                    total_loss=self.total_loss,
-                                    module_area=self.module_area,
-                                    oda_t=self.oda_t)
+        self.cpu            = CPU(p_pv          = self.p_pv,
+                                  p_load        = self.p_load,
+                                  b_type        = self.b_type,
+                                  switch_b      = self.switch_b,
+                                  switch_pv     = self.switch_pv,
+                                  p_kw          = self.p_kw,
+                                  capacity      = self.capacity,
+                                  signal        = self.signal,
+                                  pv_kw         = self.pv_kw,
+                                  num_panels    = self.num_panels,
+                                  panel_peak_p  = self.panel_peak_p,
+                                  pv_eff        = self.pv_eff,
+                                  roof_area     = self.roof_area,
+                                  pv_total_loss = self.pv_total_loss,
+                                  module_area   = self.module_area,
+                                  oda_t         = self.oda_t,
+                                  )
+        self.meta           = self.cpu.meta
 
     def get_irrad_data(self):
         return self.irrad_data
@@ -407,12 +464,13 @@ class Prosumer(CPU):
         """
         """
 
-        timestep    = timegrid(self.irrad_data)
+        # timestep    = timegrid(self.irrad_data)
+        timestep = 60
         i, j        = 0
         while signal=='self-consumption':
-            p_pv    = self.pvgen.production(self.irrad_data.iloc[i, 0]) # TODO! migrate to CPU
+            irr_sun = self.irrad_data.iloc[i, 0]
             p_load  = self.load_demand.iloc[j, 0]
-            self.cpu.control(p_pv, p_load, timestep)
+            self.cpu.control(irr_sun, p_load, timestep)
             i += 1
             j += 1
             # TODO! introduce logic for variation of signals
