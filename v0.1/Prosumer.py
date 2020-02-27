@@ -369,6 +369,7 @@ class CPU(BatterySimple, PVgen):
                             oda_t           = self.oda_t,
                             )
         self.meta   = {
+                       'timestamp'          : [],
                        'p_load'             : [],
                        'p_pv'               : [],
                        'p_battery_flow'     : [],
@@ -380,8 +381,11 @@ class CPU(BatterySimple, PVgen):
                        }
     
     def get_cpu_data(self):
-        return pd.DataFrame(self.meta)
+        return pd.DataFrame(self.meta, index=self.meta['timestamp'])
   
+    def add_timestamp(self, timestamp):
+        self.meta['timestamp'].append(timestamp)
+    
     def control(self, irr_sun, p_load, timestep):
         
         p_pv    = self.pvgen.production(irr_sun, timestep)
@@ -503,6 +507,7 @@ class Prosumer(CPU):
             irr_sun = irrad_data.iloc[i]
             p_load  = self.load_demand.iloc[i]
             self.cpu.control(irr_sun, p_load, timestep)
+            self.cpu.add_timestamp(irrad_data.index[i])
             i += 1
             if i >= len(irrad_data) or i >= len(self.load_demand):
                 self.signal = 'ended'
@@ -531,7 +536,7 @@ if __name__ == "__main__":
         load_demand=load_demand.str.replace(',', '.')
         load_demand=30*pd.to_numeric(load_demand)
 
-    #=========================================================================
+    # ========================================================================
     # Test model
     p = Prosumer(pv_kw=2.1, battery_capacity=3.5, load_demand=load_demand)
     p.active(irrad_data=irrad_data)
@@ -539,6 +544,9 @@ if __name__ == "__main__":
     results = p.get_cpu_data()
     results.iloc[:,:-2].plot()
     
+    # ========================================================================
+    # Show some results
+
     plt.figure(figsize=(12,12))
     plt.plot(results.p_load[720:960], 'orange', label='load')
     plt.plot(results.p_pv[720:960], 'r', label='pv')
