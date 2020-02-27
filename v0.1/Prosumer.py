@@ -39,16 +39,16 @@ class BatterySimple(object):
 
     state = 'Fully charged'
     
-    def __init__(self, p_kw=None, capacity=7.5, meta=None, signal=None):
+    def __init__(self, p_kw=None, capacity=7.5, signal=None):
 
         self.p_kw       = p_kw                  # power exchange [kW] (< 0 charging)
         self.capacity   = capacity              # capacity of battery [kWh]
+        self.signal     = signal                # resembles signals from outside
         self.meta       = {'P'          : [],   # dictionary of data
                            'p_reject'   : [],   # rejected by battery
                            'SOC'        : [],   # state of charge
                            'log'        : [],   # occurrences
                            }     
-        self.signal     = signal            # resembles signals from outside
     
     def get_battery_soc(self):
         if len(self.meta['SOC']) == 0:
@@ -302,6 +302,7 @@ class CPU(BatterySimple, PVgen):
             self.battery = BatterySimple()
         # elif self.b_type == "phys":
         #     self.battery = Battery()
+        self.pvgen      = PVgen()
         self.switch_b   = switch_b
         self.switch_pv  = switch_pv
         self.meta       = {'p_load'             : [],
@@ -366,6 +367,11 @@ class Prosumer(CPU):
                  signal         = None,
                  ):
 
+        self.p_kw           = p_kw
+        self.capacity       = capacity
+        self.signal         = signal
+        self.p_pv           = p_pv
+        self.p_load         = p_load
         self.irrad_data     = irrad_data
         self.load_demand    = load_demand
         self.pv_kw          = pv_kw
@@ -376,11 +382,7 @@ class Prosumer(CPU):
         self.total_loss     = total_loss
         self.module_area    = module_area
         self.oda_t          = oda_t
-        self.p_pv           = p_pv
-        self.p_load         = p_load
-        self.p_kw           = p_kw
-        self.capacity       = capacity
-        self.signal         = signal
+
         self.battery        = BatterySimple(p_kw=self.p_kw,
                                             capacity=self.capacity,
                                             signal=self.signal)
