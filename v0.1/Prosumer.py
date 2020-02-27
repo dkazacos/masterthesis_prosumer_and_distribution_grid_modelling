@@ -8,6 +8,7 @@ Created on Sat Feb  1 16:11:55 2020
 import sys
 sys.path.append('..')
 import pandas as pd
+import numpy as np
 import math
 import decimal
 from utils.function_repo import timegrid
@@ -38,6 +39,7 @@ class BatterySimple(object):
     """
 
     state   = 'Fully charged'
+    signal  = 'self-consumption'
     p_kw    = None
     
     def __init__(self,
@@ -314,9 +316,9 @@ class CPU(BatterySimple, PVgen):
                  b_type         = 'linear',
                  switch_b       = None,
                  switch_pv      = None,
-                 p_kw           = None,
+                 # p_kw           = None,
                  capacity       = 7.5,
-                 signal         = None,
+                 # signal         = None,
                  pv_kw          = None,
                  num_panels     = None,
                  panel_peak_p   = 0.3,
@@ -332,9 +334,9 @@ class CPU(BatterySimple, PVgen):
         self.b_type         = b_type
         self.switch_b       = switch_b
         self.switch_pv      = switch_pv
-        self.p_kw           = p_kw
+        # self.p_kw           = p_kw
         self.capacity       = capacity
-        self.signal         = signal
+        # self.signal         = signal
         self.pv_kw          = pv_kw
         self.num_panels     = num_panels
         self.panel_peak_p   = panel_peak_p
@@ -345,9 +347,9 @@ class CPU(BatterySimple, PVgen):
         self.oda_t          = oda_t
         if self.b_type == "linear":
             self.battery = BatterySimple(
-                                         p_kw       = self.p_kw,
+                                         # p_kw       = self.p_kw,
                                          capacity   = self.capacity,
-                                         signal     = self.signal,
+                                         # signal     = self.signal,
                                          )
         # elif self.b_type == "phys":
         #     self.battery = Battery()
@@ -426,9 +428,9 @@ class Prosumer(CPU):
                  b_type         = 'linear',
                  switch_b       = None,
                  switch_pv      = None,
-                 p_kw           = None,
+                 # p_kw           = None,
                  capacity       = 7.5,
-                 signal         = None,
+                 # signal         = None,
                  pv_kw          = None,
                  num_panels     = None,
                  panel_peak_p   = 0.3,
@@ -446,9 +448,9 @@ class Prosumer(CPU):
         self.b_type         = b_type
         self.switch_b       = switch_b
         self.switch_pv      = switch_pv
-        self.p_kw           = p_kw
+        # self.p_kw           = p_kw
         self.capacity       = capacity
-        self.signal         = signal
+        # self.signal         = signal
         self.pv_kw          = pv_kw
         self.num_panels     = num_panels
         self.panel_peak_p   = panel_peak_p
@@ -464,9 +466,9 @@ class Prosumer(CPU):
                                   b_type        = self.b_type,
                                   switch_b      = self.switch_b,
                                   switch_pv     = self.switch_pv,
-                                  p_kw          = self.p_kw,
+                                  # p_kw          = self.p_kw,
                                   capacity      = self.capacity,
-                                  signal        = self.signal,
+                                  # signal        = self.signal,
                                   pv_kw         = self.pv_kw,
                                   num_panels    = self.num_panels,
                                   panel_peak_p  = self.panel_peak_p,
@@ -490,14 +492,38 @@ class Prosumer(CPU):
         """
         """
 
-        timestep    = timegrid(irrad_data)
-        i, j        = 0
+        timestep = timegrid(irrad_data)
+        i        = 0
         while self.signal =='self-consumption':
-            irr_sun = irrad_data.iloc[i, 0]
-            p_load  = self.load_demand.iloc[j, 0]
+            irr_sun = irrad_data.iloc[i]
+            p_load  = self.load_demand.iloc[i]
             self.cpu.control(irr_sun, p_load, timestep)
             i += 1
-            j += 1
-            # TODO! introduce logic for variation of signals
-            if i > len(irrad_data) or j > len(self.load_demand):
+            if i >= len(irrad_data) or i >= len(self.load_demand):
+                self.signal = 'ended'
                 break
+            # TODO! introduce logic for variation of signals
+
+if __name__ == "__main__":
+
+    # Import irradiance test data
+    irr = pd.read_csv(filepath_or_buffer='../data/1minIntSolrad-07-2006.csv',
+                      sep=';',skiprows=25, parse_dates=[[0,1]], index_col=0)
+    # Import load_profile test data
+    load_data = pd.read_csv(filepath_or_buffer='../data/1MinIntSumProfiles-Apparent-2workingpeople.csv',
+                            sep=';', usecols=[1,2],parse_dates=[1], index_col=0)
+    load_data.index=pd.to_datetime(load_data.index) + pd.Timedelta(minutes=1)
+
+    # Select 1 day for test
+    irrad_data=irr.iloc[:, 3]
+
+    load_demand=load_data.iloc[:, 0]
+
+    if any(',' in string for string in load_demand):
+        load_demand=load_demand.str.replace(',', '.')
+        load_demand=pd.to_numeric(load_demand)
+
+    p = Prosumer(pv_kw=1.5, capacity=200, load_demand=load_demand)
+    p.active(irrad_data=irrad_data)
+    results = p.get_cpu_data()
+    results.iloc[:,:-2].plot()
