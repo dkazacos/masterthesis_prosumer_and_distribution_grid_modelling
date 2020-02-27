@@ -22,14 +22,8 @@ class BatterySimple(object):
 
     Parameters
     ----------
-    p_kw : float, default None
-        power flow that charges or discharges battery in kW
-
     battery_capacity : float, default 7.5
         capacity of the battery in kWh
-
-    meta : dict, default None
-        dictionary containing process data
 
     signal : str, default None
         place-holder for external control signals
@@ -62,22 +56,37 @@ class BatterySimple(object):
             raise AttributeError('Battery capacity cannot be a negative number')
     
     def get_battery_soc(self):
+        """
+        Returns the battery state of charge in %
+        """
         if len(self.meta['SOC']) == 0:
             return 100
         else:
             return self.meta['SOC'][-1]
     
     def get_battery_state(self):
+        """
+        Returns the current state of a battery instance as a string log
+        """
         return self.state
     
     def get_battery_data(self):
+        """
+        Returns a pandas dataframe composed by object's meta dictionary
+        """
         return pd.DataFrame(self.meta)
     
     def get_battery_capacity(self):
+        """
+        Returns the battery capacity in kWh
+        """
         return self.battery_capacity
     
     def bms(self):
-        
+        """
+        Battery Management System (BMS). Dictates the acceptance of
+        rejection of power flow by the battery
+        """
         if self.p_kw < 0:
             if self.state == 'Fully charged':
                 return 0
@@ -94,6 +103,8 @@ class BatterySimple(object):
     def process(self, p_kw, timestep):
         
         """
+        Populates an object's meta dictionary with data comming from the
+        power flow through the battery after BMS filtering
         """
         self.p_kw   = p_kw
         h           = timestep/3600
@@ -251,16 +262,26 @@ class PVgen(object):
                 self.num_panels = self.pv_kw / self.panel_peak_p
         
     def get_installed_pv(self):
+        """
+        Returns the PV installed power in kW
+        """
         return self.pv_kw
     
     def get_pv_sys_loss(self):
+        """
+        Returns the PV total power loss in per unit
+        """
         return self.pv_total_loss
     
     def get_pv_data(self):
+        """
+        Returns pandas dataframe composed by object's meta dictionray of data
+        """
         return pd.DataFrame(self.meta)
     
     def production(self, irr_sol, timestep):
         """
+        A simple model of the PV power pordocution is executed by this function
 
         Parameters
         ----------
@@ -285,16 +306,12 @@ class PVgen(object):
 class CPU(BatterySimple, PVgen):
     
     """
-    Control unit for power flow from/to the battery and from/to the grid
+    Control process unit allows for data transfer throughout the prosumer
+    simulation. Control unit for power flow from/to the battery and from/to 
+    the grid
 
     Parameters
     ----------
-    p_pv : float, default None
-        power output of PV installation at a given timestamp
-
-    p_load : float, default None
-        power requirements of prosumer at a given timestamp
-
     b_type : str, default 'linear'
         type of battery to be used by the simulation. 
         'linear' battery is an instance of BatterySimple class.
@@ -307,6 +324,34 @@ class CPU(BatterySimple, PVgen):
     switch_pv : int, default None
         switch that bypasses the PV installation. 0 or 1 for closed or opened
 
+    battery_capacity: float, default 7.5 kWh
+        capacity of the battery in kWh
+
+    pv_kw : float, default None
+        installed peak power mounted on roof top in kW
+
+    num_panels : int default None
+        number of solar panels mounted on roof top. Need
+
+    panel_peak_p : float, default 0.3
+        rated power of a single solar panel in kW
+
+    pv_eff : float, default 0.18
+        efficiency of single solar panel
+
+    roof_area : float, default None
+        available roof area to mount PV installation
+
+    total_loss : float, default 0.0035
+        total loss due to cable transmission
+
+    module_area : float, default 1.96 m2
+        area of a single solar panel
+
+    oda_t : float, default None
+        outdoor air temperature data. Power output dependency on outdoor
+        temperature is not yet defined.
+        
     Return
     ----------
 
@@ -381,12 +426,41 @@ class CPU(BatterySimple, PVgen):
                        }
     
     def get_cpu_data(self):
+        """
+        Returns pandas dataframe composed by object's meta dictionary of data
+        """
         return pd.DataFrame(self.meta, index=self.meta['timestamp'])
   
     def add_timestamp(self, timestamp):
+        """
+        Extracts the datetime string at every time step of the simulation and
+        appends it to object's meta dictionary of data for final call to
+        results
+        
+        Parameters
+        ----------
+        timestep : float, default None
+            number of seconds between every time step of the simulation
+        """
         self.meta['timestamp'].append(timestamp)
     
     def control(self, irr_sun, p_load, timestep):
+        """
+        Function that dictates the behavior of the power flow among the
+        components of a Prosumer object and in relationship with the grid
+        
+        Parameters
+        ----------
+        irr_sun : float, default None
+            solar irradiation at a given time step of the simulation in Wh/m2
+
+        p_load : float, default None
+            power requirements of Prosumer at a given time step of the
+            simulation in kWh during timestep time
+
+        timestep : float, default None
+            number of seconds between every time step of the simulation
+        """        
         
         p_pv    = self.pvgen.production(irr_sun, timestep)
         p_flow  = p_load - p_pv
@@ -425,6 +499,57 @@ class CPU(BatterySimple, PVgen):
 class Prosumer(CPU):
     
     """
+    Prosumer class that resembles the behavior of a houshold that consumes and
+    produces electric power
+
+    Parameters
+    ----------
+    load_demand : pandas Series, default None
+        time series of load profile data for a prosumer
+
+    b_type : str, default 'linear'
+        type of battery to be used by the simulation. 
+        'linear' battery is an instance of BatterySimple class.
+        'phys' battery is an instance of a more advanced physical model of a
+        battery. An instance of the class Battery from Storage.py module
+
+    switch_b : int, default None
+        switch that bypasses the battery. 0 or 1 for closed or opened
+
+    switch_pv : int, default None
+        switch that bypasses the PV installation. 0 or 1 for closed or opened
+
+    battery_capacity: float, default 7.5 kWh
+        capacity of the battery in kWh
+
+    pv_kw : float, default None
+        installed peak power mounted on roof top in kW
+
+    num_panels : int default None
+        number of solar panels mounted on roof top. Need
+
+    panel_peak_p : float, default 0.3
+        rated power of a single solar panel in kW
+
+    pv_eff : float, default 0.18
+        efficiency of single solar panel
+
+    roof_area : float, default None
+        available roof area to mount PV installation
+
+    total_loss : float, default 0.0035
+        total loss due to cable transmission
+
+    module_area : float, default 1.96 m2
+        area of a single solar panel
+
+    oda_t : float, default None
+        outdoor air temperature data. Power output dependency on outdoor
+        temperature is not yet defined.
+        
+    Return
+    ----------
+    
     """
     
     signal = 'self-consumption'
@@ -495,10 +620,22 @@ class Prosumer(CPU):
     #     return self.irrad_data
 
     def get_load_demand(self):
+        """
+        Returns load profile data as a pandas series object
+        """
         return self.load_demand
 
     def active(self, irrad_data):
         """
+        Runs the data transfer at every timestamp of the simulation. This
+        method calls CPU's control in a discrete fashion and allows for
+        breaking and continuing the process given external signals
+        
+        Parameters
+        ----------
+        irrad_data : pandas Series, default None
+            time series of irradiation data that will be passed to the PV
+            installation in Wh/m2
         """
 
         timestep = timegrid(irrad_data)
