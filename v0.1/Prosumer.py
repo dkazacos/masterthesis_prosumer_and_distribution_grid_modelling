@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 import math
 import decimal
+import matplotlib.pyplot as plt
 from utils.function_repo import timegrid
 
 class BatterySimple(object):
@@ -24,7 +25,7 @@ class BatterySimple(object):
     p_kw : float, default None
         power flow that charges or discharges battery in kW
 
-    capacity : float, default 7.5
+    battery_capacity : float, default 7.5
         capacity of the battery in kWh
 
     meta : dict, default None
@@ -43,20 +44,22 @@ class BatterySimple(object):
     p_kw    = None
     
     def __init__(self,
-                 # p_kw       = None,
-                 capacity   = 7.5,
-                 signal     = None,
+                 # p_kw             = None,
+                 battery_capacity   = 7.5,
+                 signal             = None,
                  ):
 
-        # self.p_kw       = p_kw                  # power exchange [kW] (< 0 charging)
-        self.capacity   = capacity              # capacity of battery [kWh]
-        self.signal     = signal                # resembles signals from outside
-        self.meta       = {
-                           'P'          : [],   # dictionary of data
-                           'p_reject'   : [],   # rejected by battery
-                           'SOC'        : [],   # state of charge
-                           'log'        : [],   # occurrences
-                           }     
+        # self.p_kw             = p_kw                  # power exchange [kW] (< 0 charging)
+        self.battery_capacity   = battery_capacity      # capacity of battery [kWh]
+        self.signal             = signal                # resembles signals from outside
+        self.meta               = {
+                                   'P'          : [],   # dictionary of data
+                                   'p_reject'   : [],   # rejected by battery
+                                   'SOC'        : [],   # state of charge
+                                   'log'        : [],   # occurrences
+                                   }
+        if self.battery_capacity < 0:
+            raise AttributeError('Battery capacity cannot be a negative number')
     
     def get_battery_soc(self):
         if len(self.meta['SOC']) == 0:
@@ -71,7 +74,7 @@ class BatterySimple(object):
         return pd.DataFrame(self.meta)
     
     def get_battery_capacity(self):
-        return self.capacity
+        return self.battery_capacity
     
     def bms(self):
         
@@ -96,7 +99,7 @@ class BatterySimple(object):
         h           = timestep/3600
         st          = self.get_battery_state()
         p           = self.bms()
-        c           = self.capacity
+        c           = self.battery_capacity
         
         if p > 0: # discharge battery
             if len(self.meta['SOC']) == 0:
@@ -235,6 +238,8 @@ class PVgen(object):
             else:
                 print('Missing args: see PVgen class documentation. Need pv_kw, num_panels or roof_area')
         elif self.pv_kw and not self.num_panels:
+            if self.pv_kw < 0:
+                raise AttributeError('PV installed power cannot be a negative number')
             if self.roof_area:
                 if self.pv_kw / self.panel_peak_p * self.module_area > self.roof_area:
                     raise AttributeError('Invalid PVgen installed power. Not enough roof area for given module characteritics to yield %s kW. Reduce PV installed power or increase roof area' % self.pv_kw)
@@ -311,45 +316,45 @@ class CPU(BatterySimple, PVgen):
     strategy = 'pv-priority'        # also: 'grid-friendly', 'cooperative'
 
     def __init__(self,
-                 # p_pv           = None,
-                 # p_load         = None,
-                 b_type         = 'linear',
-                 switch_b       = None,
-                 switch_pv      = None,
-                 # p_kw           = None,
-                 capacity       = 7.5,
-                 # signal         = None,
-                 pv_kw          = None,
-                 num_panels     = None,
-                 panel_peak_p   = 0.3,
-                 pv_eff         = 0.18,
-                 roof_area      = None,
-                 pv_total_loss  = 0.0035,
-                 module_area    = 1.96,
-                 oda_t          = None,
-                 ):
+                  # p_pv            = None,
+                  # p_load          = None,
+                  b_type            = 'linear',
+                  switch_b          = None,
+                  switch_pv         = None,
+                  # p_kw            = None,
+                  battery_capacity  = 7.5,
+                  # signal          = None,
+                  pv_kw             = None,
+                  num_panels        = None,
+                  panel_peak_p      = 0.3,
+                  pv_eff            = 0.18,
+                  roof_area         = None,
+                  pv_total_loss     = 0.0035,
+                  module_area       = 1.96,
+                  oda_t             = None,
+                  ):
 
-        # self.p_pv           = p_pv
-        # self.p_load         = p_load
-        self.b_type         = b_type
-        self.switch_b       = switch_b
-        self.switch_pv      = switch_pv
-        # self.p_kw           = p_kw
-        self.capacity       = capacity
-        # self.signal         = signal
-        self.pv_kw          = pv_kw
-        self.num_panels     = num_panels
-        self.panel_peak_p   = panel_peak_p
-        self.pv_eff         = pv_eff
-        self.roof_area      = roof_area
-        self.pv_total_loss  = pv_total_loss
-        self.module_area    = module_area
-        self.oda_t          = oda_t
+        # self.p_pv             = p_pv
+        # self.p_load           = p_load
+        self.b_type             = b_type
+        self.switch_b           = switch_b
+        self.switch_pv          = switch_pv
+        # self.p_kw             = p_kw
+        self.battery_capacity   = battery_capacity
+        # self.signal           = signal
+        self.pv_kw              = pv_kw
+        self.num_panels         = num_panels
+        self.panel_peak_p       = panel_peak_p
+        self.pv_eff             = pv_eff
+        self.roof_area          = roof_area
+        self.pv_total_loss      = pv_total_loss
+        self.module_area        = module_area
+        self.oda_t              = oda_t
         if self.b_type == "linear":
             self.battery = BatterySimple(
-                                         # p_kw       = self.p_kw,
-                                         capacity   = self.capacity,
-                                         # signal     = self.signal,
+                                         # p_kw           = self.p_kw,
+                                         battery_capacity = self.battery_capacity,
+                                         # signal         = self.signal,
                                          )
         # elif self.b_type == "phys":
         #     self.battery = Battery()
@@ -421,62 +426,62 @@ class Prosumer(CPU):
     signal = 'self-consumption'
 
     def __init__(self,
-                 # irrad_data     = None,
-                 load_demand    = None,
-                 # p_pv           = None,
-                 # p_load         = None,
-                 b_type         = 'linear',
-                 switch_b       = None,
-                 switch_pv      = None,
-                 # p_kw           = None,
-                 capacity       = 7.5,
-                 # signal         = None,
-                 pv_kw          = None,
-                 num_panels     = None,
-                 panel_peak_p   = 0.3,
-                 pv_eff         = 0.18,
-                 roof_area      = None,
-                 pv_total_loss  = 0.0035,
-                 module_area    = 1.96,
-                 oda_t          = None,
+                 # irrad_data       = None,
+                 load_demand        = None,
+                 # p_pv             = None,
+                 # p_load           = None,
+                 b_type             = 'linear',
+                 switch_b           = None,
+                 switch_pv          = None,
+                 # p_kw             = None,
+                 battery_capacity   = 7.5,
+                 # signal           = None,
+                 pv_kw              = None,
+                 num_panels         = None,
+                 panel_peak_p       = 0.3,
+                 pv_eff             = 0.18,
+                 roof_area          = None,
+                 pv_total_loss      = 0.0035,
+                 module_area        = 1.96,
+                 oda_t              = None,
                  ):
 
-        # self.irrad_data     = irrad_data
-        self.load_demand    = load_demand
-        # self.p_pv           = p_pv
-        # self.p_load         = p_load
-        self.b_type         = b_type
-        self.switch_b       = switch_b
-        self.switch_pv      = switch_pv
-        # self.p_kw           = p_kw
-        self.capacity       = capacity
-        # self.signal         = signal
-        self.pv_kw          = pv_kw
-        self.num_panels     = num_panels
-        self.panel_peak_p   = panel_peak_p
-        self.pv_eff         = pv_eff
-        self.roof_area      = roof_area
-        self.pv_total_loss  = pv_total_loss
-        self.module_area    = module_area
-        self.oda_t          = oda_t
+        # self.irrad_data       = irrad_data
+        self.load_demand        = load_demand
+        # self.p_pv             = p_pv
+        # self.p_load           = p_load
+        self.b_type             = b_type
+        self.switch_b           = switch_b
+        self.switch_pv          = switch_pv
+        # self.p_kw             = p_kw
+        self.battery_capacity   = battery_capacity
+        # self.signal           = signal
+        self.pv_kw              = pv_kw
+        self.num_panels         = num_panels
+        self.panel_peak_p       = panel_peak_p
+        self.pv_eff             = pv_eff
+        self.roof_area          = roof_area
+        self.pv_total_loss      = pv_total_loss
+        self.module_area        = module_area
+        self.oda_t              = oda_t
 
         self.cpu            = CPU(
-                                  # p_pv          = self.p_pv,
-                                  # p_load        = self.p_load,
-                                  b_type        = self.b_type,
-                                  switch_b      = self.switch_b,
-                                  switch_pv     = self.switch_pv,
-                                  # p_kw          = self.p_kw,
-                                  capacity      = self.capacity,
-                                  # signal        = self.signal,
-                                  pv_kw         = self.pv_kw,
-                                  num_panels    = self.num_panels,
-                                  panel_peak_p  = self.panel_peak_p,
-                                  pv_eff        = self.pv_eff,
-                                  roof_area     = self.roof_area,
-                                  pv_total_loss = self.pv_total_loss,
-                                  module_area   = self.module_area,
-                                  oda_t         = self.oda_t,
+                                  # p_pv            = self.p_pv,
+                                  # p_load          = self.p_load,
+                                  b_type            = self.b_type,
+                                  switch_b          = self.switch_b,
+                                  switch_pv         = self.switch_pv,
+                                  # p_kw            = self.p_kw,
+                                  battery_capacity  = self.battery_capacity,
+                                  # signal          = self.signal,
+                                  pv_kw             = self.pv_kw,
+                                  num_panels        = self.num_panels,
+                                  panel_peak_p      = self.panel_peak_p,
+                                  pv_eff            = self.pv_eff,
+                                  roof_area         = self.roof_area,
+                                  pv_total_loss     = self.pv_total_loss,
+                                  module_area       = self.module_area,
+                                  oda_t             = self.oda_t,
                                   )
         self.battery        = self.cpu.battery
         self.pvgen          = self.cpu.pvgen
@@ -506,6 +511,9 @@ class Prosumer(CPU):
 
 if __name__ == "__main__":
 
+    # ========================================================================
+    # Data preparation
+
     # Import irradiance test data
     irr = pd.read_csv(filepath_or_buffer='../data/1minIntSolrad-07-2006.csv',
                       sep=';',skiprows=25, parse_dates=[[0,1]], index_col=0)
@@ -521,9 +529,20 @@ if __name__ == "__main__":
 
     if any(',' in string for string in load_demand):
         load_demand=load_demand.str.replace(',', '.')
-        load_demand=pd.to_numeric(load_demand)
+        load_demand=30*pd.to_numeric(load_demand)
 
-    p = Prosumer(pv_kw=1.5, capacity=200, load_demand=load_demand)
+    #=========================================================================
+    # Test model
+    p = Prosumer(pv_kw=2.1, battery_capacity=3.5, load_demand=load_demand)
     p.active(irrad_data=irrad_data)
+    
     results = p.get_cpu_data()
     results.iloc[:,:-2].plot()
+    
+    plt.figure(figsize=(12,12))
+    plt.plot(results.p_load[720:960], 'orange', label='load')
+    plt.plot(results.p_pv[720:960], 'r', label='pv')
+    plt.plot(results.p_battery_flow[720:960], 'g', label='batt')
+    plt.plot(results.p_grid_flow[720:960], 'b', label='grid')
+    plt.legend()
+    plt.show()
