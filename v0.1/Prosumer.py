@@ -555,12 +555,15 @@ if __name__ == "__main__":
     
     # ========================================================================
     # Show some results
-    plt.figure(figsize=(12,12))
-    fig, ax = plt.subplos(figsize=(12,12))
+    fig, ax = plt.subplots(figsize=(12,12))
 
-    plt.plot(results.p_load[720:960], 'orange', label='load')
-    plt.plot(results.p_pv[720:960], 'r', label='pv')
-    plt.plot(results.p_battery_flow[720:960], 'g', label='batt')
-    plt.plot(results.p_grid_flow[720:960], 'b', label='grid')
-    plt.legend()
-    plt.show()
+    ax.plot(results.p_load[720:960], 'orange', label='load')
+    ax.plot(results.p_pv[720:960], 'r', label='pv')
+    ax.plot(results.p_battery_flow[720:960], 'g', label='batt')
+    ax.plot(results.p_grid_flow[720:960], 'b', label='grid')
+    start, end = ax.get_xlim()
+    ax.xaxis.set_ticks(np.arange(start, end, 10))
+    fig.autofmt_xdate()
+    ax.legend()
+
+    fig.show()
