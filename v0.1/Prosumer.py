@@ -543,11 +543,11 @@ if __name__ == "__main__":
 
     # ========================================================================
     # Test model and get results
-    p       = Prosumer(
-                       pv_kw            = 2.1,
-                       battery_capacity = 3.5,
-                       load_demand      = load_demand,
-                       )
+    p = Prosumer(
+                 pv_kw            = 2.1,
+                 battery_capacity = 3.5,
+                 load_demand      = load_demand,
+                 )
     p.active(
              irrad_data = irrad_data,
              )
