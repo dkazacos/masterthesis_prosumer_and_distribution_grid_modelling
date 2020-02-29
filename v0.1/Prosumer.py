@@ -13,6 +13,7 @@ import math
 import decimal
 import matplotlib.pyplot as plt
 from utils.function_repo import timegrid
+# from Storage import Battery
 
 class BatterySimple(object):
     """
@@ -413,15 +414,15 @@ class CPU(BatterySimple, PVgen):
                                          battery_capacity = self.battery_capacity,
                                          # signal         = self.signal,
                                          )
-        elif self.b_type == "phys":
-            self.battery = Battery(
-                                   ncells      = self.ncells,
-                                   cn          = self.cn,
-                                   vn          = self.vn,
-                                   dco         = self.dco,
-                                   cco         = self.cco,
-                                   max_c_rate  = self.max_c_rate,
-                                   )
+        # elif self.b_type == "phys":
+        #     self.battery = Battery(
+        #                            ncells      = self.ncells,
+        #                            cn          = self.cn,
+        #                            vn          = self.vn,
+        #                            dco         = self.dco,
+        #                            cco         = self.cco,
+        #                            max_c_rate  = self.max_c_rate,
+        #                            )
         self.pvgen  = PVgen(
                             pv_kw           = self.pv_kw,
                             num_panels      = self.num_panels,
@@ -727,26 +728,33 @@ if __name__ == "__main__":
                      **META,
                      )
 
-    pphys = Prosumer(
-                    b_type = 'phys',
-                    ncells = 1000,
-                    )
+    # pphys = Prosumer(
+    #                 b_type = 'phys',
+    #                 ncells = 1000,
+    #                 **META,
+    #                 )
 
     psimp.active(
-                 irrad_data = irrad_data,
-                 )
-    res_simp = psimp.get_cpu_data()
+                irrad_data = irrad_data,
+                )
 
+    # pphys.active(
+    #             irrad_data = irrad_data,
+    #             )
+
+    prosumer_dict = {}
+    prosumer_dict['res_simp'] = psimp.get_cpu_data()
+    # prosumer_dict['res_phys'] = pphys.get_cpu_data()
 
     # ========================================================================
     # Show some results
-    for i in (res_simp, res_phys):
+    for key, val in prosumer_dict:
         fig, ax = plt.subplots(figsize=(12,12))
 
-        ax.plot(i.p_load[720:960], 'orange', label='load')
-        ax.plot(i.p_pv[720:960], 'r', label='pv')
-        ax.plot(i.p_battery_flow[720:960], 'g', label='batt')
-        ax.plot(i.p_grid_flow[720:960], 'b', label='grid')
+        ax.plot(val.p_load[720:960], 'orange', label='load')
+        ax.plot(val.p_pv[720:960], 'r', label='pv')
+        ax.plot(val.p_battery_flow[720:960], 'g', label='batt')
+        ax.plot(val.p_grid_flow[720:960], 'b', label='grid')
         start, end = ax.get_xlim()
         ax.xaxis.set_ticks(np.arange(start, end, 10))
         fig.autofmt_xdate()
