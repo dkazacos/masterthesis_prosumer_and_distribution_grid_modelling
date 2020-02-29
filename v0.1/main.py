@@ -9,13 +9,12 @@ import sys
 sys.path.append('..')
 import pandas as pd
 import numpy as np
-import math
-import decimal
 import matplotlib.pyplot as plt
-from utils.function_repo import timegrid
+from Prosumer import Prosumer
 
 # ========================================================================
 # MAIN
+
 # Data preparation
 # Import irradiance test data
 irr = pd.read_csv(
@@ -42,26 +41,45 @@ if any(',' in string for string in load_demand):
 
 # ========================================================================
 # Test model and get results
-p = Prosumer(
-             pv_kw            = 2.1,
-             battery_capacity = 3.5,
-             load_demand      = load_demand,
-             )
-p.active(
-         irrad_data = irrad_data,
-         )
-results = p.get_cpu_data()
+META = {
+        'pv_kw'         : 2.1,
+        'load_demand'   : load_demand,
+        }
+psimp = Prosumer(
+                 b_type             = 'linear',
+                 battery_capacity   = 3.5,
+                 **META,
+                 )
+
+# pphys = Prosumer(
+#                 b_type = 'phys',
+#                 ncells = 1000,
+#                 **META,
+#                 )
+
+psimp.active(
+            irrad_data = irrad_data,
+            )
+
+# pphys.active(
+#             irrad_data = irrad_data,
+#             )
+
+prosumer_dict = {}
+prosumer_dict['res_simp'] = psimp.get_cpu_data()
+# prosumer_dict['res_phys'] = pphys.get_cpu_data()
 
 # ========================================================================
 # Show some results
-fig, ax = plt.subplots(figsize=(12,12))
+for val in prosumer_dict.values():
+    fig, ax = plt.subplots(figsize=(12,12))
 
-ax.plot(results.p_load[720:960], 'orange', label='load')
-ax.plot(results.p_pv[720:960], 'r', label='pv')
-ax.plot(results.p_battery_flow[720:960], 'g', label='batt')
-ax.plot(results.p_grid_flow[720:960], 'b', label='grid')
-start, end = ax.get_xlim()
-ax.xaxis.set_ticks(np.arange(start, end, 10))
-fig.autofmt_xdate()
-ax.legend()
-plt.title('Power flow during 1st simulated day', fontsize=18)
+    ax.plot(val.p_load[720:960], 'orange', label='load')
+    ax.plot(val.p_pv[720:960], 'r', label='pv')
+    ax.plot(val.p_battery_flow[720:960], 'g', label='batt')
+    ax.plot(val.p_grid_flow[720:960], 'b', label='grid')
+    start, end = ax.get_xlim()
+    ax.xaxis.set_ticks(np.arange(start, end, 10))
+    fig.autofmt_xdate()
+    ax.legend()
+    plt.title('Power flow during 1st simulated day', fontsize=18)
