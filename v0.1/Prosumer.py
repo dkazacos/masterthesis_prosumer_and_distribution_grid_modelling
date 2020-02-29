@@ -40,12 +40,12 @@ class BatterySimple(object):
     def __init__(self,
                  # p_kw             = None,
                  battery_capacity   = 7.5,
-                 signal             = None,
+                 # signal           = None,
                  ):
 
         # self.p_kw             = p_kw                  # power exchange [kW] (< 0 charging)
         self.battery_capacity   = battery_capacity      # capacity of battery [kWh]
-        self.signal             = signal                # resembles signals from outside
+        # self.signal           = signal                # resembles signals from outside
         self.meta               = {
                                    'P'          : [],   # dictionary of data
                                    'p_reject'   : [],   # rejected by battery
@@ -369,6 +369,12 @@ class CPU(BatterySimple, PVgen):
                   # p_kw            = None,
                   battery_capacity  = 7.5,
                   # signal          = None,
+                  ncells            = 1000,
+                  cn                = 2.55,
+                  vn                = 3.7,
+                  dco               = 3.0,
+                  cco               = 4.2,
+                  max_c_rate        = 10,
                   pv_kw             = None,
                   num_panels        = None,
                   panel_peak_p      = 0.3,
@@ -387,6 +393,12 @@ class CPU(BatterySimple, PVgen):
         # self.p_kw             = p_kw
         self.battery_capacity   = battery_capacity
         # self.signal           = signal
+        self.ncells             = ncells
+        self.cn                 = cn
+        self.vn                 = vn
+        self.dco                = dco
+        self.cco                = cco
+        self.max_c_rate         = max_c_rate
         self.pv_kw              = pv_kw
         self.num_panels         = num_panels
         self.panel_peak_p       = panel_peak_p
@@ -401,8 +413,15 @@ class CPU(BatterySimple, PVgen):
                                          battery_capacity = self.battery_capacity,
                                          # signal         = self.signal,
                                          )
-        # elif self.b_type == "phys":
-        #     self.battery = Battery()
+        elif self.b_type == "phys":
+            self.battery = Battery(
+                                   ncells      = self.ncells,
+                                   cn          = self.cn,
+                                   vn          = self.vn,
+                                   dco         = self.dco,
+                                   cco         = self.cco,
+                                   max_c_rate  = self.max_c_rate,
+                                   )
         self.pvgen  = PVgen(
                             pv_kw           = self.pv_kw,
                             num_panels      = self.num_panels,
@@ -565,6 +584,12 @@ class Prosumer(CPU):
                  # p_kw             = None,
                  battery_capacity   = 7.5,
                  # signal           = None,
+                 ncells             = 1000,
+                 cn                 = 2.55,
+                 vn                 = 3.7,
+                 dco                = 3.0,
+                 cco                = 4.2,
+                 max_c_rate         = 10,
                  pv_kw              = None,
                  num_panels         = None,
                  panel_peak_p       = 0.3,
@@ -585,6 +610,12 @@ class Prosumer(CPU):
         # self.p_kw             = p_kw
         self.battery_capacity   = battery_capacity
         # self.signal           = signal
+        self.ncells             = ncells
+        self.cn                 = cn
+        self.vn                 = vn
+        self.dco                = dco
+        self.cco                = cco
+        self.max_c_rate         = max_c_rate
         self.pv_kw              = pv_kw
         self.num_panels         = num_panels
         self.panel_peak_p       = panel_peak_p
@@ -603,6 +634,12 @@ class Prosumer(CPU):
                                   # p_kw            = self.p_kw,
                                   battery_capacity  = self.battery_capacity,
                                   # signal          = self.signal,
+                                  ncells            = self.ncells,
+                                  cn                = self.cn,
+                                  vn                = self.vn,
+                                  dco               = self.dco,
+                                  cco               = self.cco,
+                                  max_c_rate        = self.max_c_rate,
                                   pv_kw             = self.pv_kw,
                                   num_panels        = self.num_panels,
                                   panel_peak_p      = self.panel_peak_p,
@@ -680,26 +717,38 @@ if __name__ == "__main__":
 
     # ========================================================================
     # Test model and get results
-    p = Prosumer(
-                 pv_kw            = 2.1,
-                 battery_capacity = 3.5,
-                 load_demand      = load_demand,
+    META = {
+            'pv_kw'         : 2.1,
+            'load_demand'   : load_demand,
+            }
+    psimp = Prosumer(
+                     b_type             = 'linear',
+                     battery_capacity   = 3.5,
+                     **META,
+                     )
+
+    pphys = Prosumer(
+                    b_type = 'phys',
+                    ncells = 1000,
+                    )
+
+    psimp.active(
+                 irrad_data = irrad_data,
                  )
-    p.active(
-             irrad_data = irrad_data,
-             )
-    results = p.get_cpu_data()
-    
+    res_simp = psimp.get_cpu_data()
+
+
     # ========================================================================
     # Show some results
-    fig, ax = plt.subplots(figsize=(12,12))
+    for i in (res_simp, res_phys):
+        fig, ax = plt.subplots(figsize=(12,12))
 
-    ax.plot(results.p_load[720:960], 'orange', label='load')
-    ax.plot(results.p_pv[720:960], 'r', label='pv')
-    ax.plot(results.p_battery_flow[720:960], 'g', label='batt')
-    ax.plot(results.p_grid_flow[720:960], 'b', label='grid')
-    start, end = ax.get_xlim()
-    ax.xaxis.set_ticks(np.arange(start, end, 10))
-    fig.autofmt_xdate()
-    ax.legend()
-    plt.title('Power flow during 1st simulated day', fontsize=18)
+        ax.plot(i.p_load[720:960], 'orange', label='load')
+        ax.plot(i.p_pv[720:960], 'r', label='pv')
+        ax.plot(i.p_battery_flow[720:960], 'g', label='batt')
+        ax.plot(i.p_grid_flow[720:960], 'b', label='grid')
+        start, end = ax.get_xlim()
+        ax.xaxis.set_ticks(np.arange(start, end, 10))
+        fig.autofmt_xdate()
+        ax.legend()
+        plt.title('Power flow during 1st simulated day', fontsize=18)
