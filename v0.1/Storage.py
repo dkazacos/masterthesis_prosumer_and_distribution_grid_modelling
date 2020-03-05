@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Feb 29 20:09:27 2020
+Created on Fri Feb 21 23:20:35 2020
 
 @author: Seta
 """
 
 import pandas as pd
+import numpy as np
+from scipy.integrate import odeint
 
 class BatterySimple(object):
     """
@@ -158,3 +160,253 @@ class BatterySimple(object):
                     self.meta['SOC'].append(self.meta['SOC'][-1])
             self.meta['P'].append(p)
             self.meta['log'].append('No power flow through battery')
+
+class Battery(object):
+    
+    state       = 'Stand-by'
+    signal      = 'self-consumption'
+    overload    = False
+    p_kw        = None
+    
+    def __init__(self, ncells=1000, cn=2.55, vn=3.7, dco=3.0, cco=4.2, max_c_rate=10):
+        
+        """
+        Default properties of battery cell: Li-ion CGR18650E Panasonic
+        
+        Hint: Initial state of charge = 100%
+        """
+        
+        # self.p_kw     = p_kw          # power exchange [kW]
+        self.ncells     = ncells        # number of cells in battery pack
+        self.cn         = cn            # nominal capacity of Li.ion cell [Ah]
+        self.vn         = vn            # nominal voltage of single [V]
+        self.dco        = dco           # discharge cut-off [V]
+        self.cco        = cco           # charge cut-off [V]
+        self.max_c_rate = max_c_rate    # determines max allowed current
+        self.meta       = {'P'          : [], # Store Power accepted by battery [kW]
+                           'p_reject' : [], # Store Power rejected by battery [kW]
+                           'Q'          : [], # Store charge of cell [Ah]
+                           'V1'         : [], # Store voltage of RC-1st of cell [V]
+                           'V2'         : [], # Store voltage of RC-2nd of cell [V]
+                           'Vcell'      : [], # Store cell voltage [V]
+                           'SOC'        : [], # Store cell SOC [%]
+                           }
+        # self.signal                = signal    # resembles signals from outside
+
+    # =========================================================================
+    
+    # @property
+    # def cn(self):
+    #     return self._nominal_cell_capacity
+    # @cn.setter
+    # def cn(self, capacity):
+    #     self._nominal_cell_capacity = capacity
+
+    # @property
+    # def vn(self):
+    #     return self._nominal_cell_voltage
+    # @vn.setter
+    # def vn(self, voltage):
+    #     self._nominal_cell_voltage = voltage
+        
+    # @property
+    # def dco(self):
+    #     return self._discharge_cov
+    # @dco.setter
+    # def dco(self, dicoff):
+    #     self._discharge_cov = dicoff
+    
+    # @property
+    # def cco(self):
+    #     return self._charge_cov
+    # @cco.setter
+    # def cco(self,chcoff):
+    #     self._charge_cov = chcoff
+
+    # =========================================================================
+
+    def get_soc(self):
+        if len(self.meta['SOC']) == 0:
+            return 100 # TODO! Try include parameter for user on this topic
+        else:
+            return self.meta['SOC'][-1]
+        
+    def get_state(self):
+        return self.state
+    
+    def get_capacity(self):
+        return self.cn
+    
+    def get_ccov(self):
+        return self.cco
+    
+    def get_dcov(self):
+        return self.dco
+    
+    def get_rated_energy_wh(self):
+        return self.cn*self.vn*self.ncells
+    
+    def get_data(self):
+        return pd.DataFrame(self.meta)
+    
+    def get_ncells(self):
+        return self.ncells
+    
+    def bms(self, v_cell, p_w):
+        """
+        Battery Management System. Defines safety operation of battery
+        charge and discharge
+            
+        p_w (float):   power demand/supply. External signal
+        v_cell (float): cell voltage
+        
+        Returns cell active power In/Out
+        """
+
+        if p_w/self.ncells < 0:
+            if v_cell < self.cco:
+                self.state = 'Operational'
+                return p_w/self.ncells
+            elif v_cell >= self.cco:
+                self.state = 'Fully charged'
+                # TODO! place-holder for switch
+                return 0
+            
+        elif p_w/self.ncells > 0:
+            if v_cell > self.dco:
+                self.state = 'Operational'
+                return p_w/self.ncells
+            elif v_cell <= self.dco:
+                self.state = 'Depleted'
+                # TODO! place-holder for switch
+                return 0
+        elif p_w == 0:
+            self.state = 'Stand-by'
+            return 0
+
+    def icell(self, p_i, v_cell):
+        """
+        Icell < 0 for charge of cell
+        Icell > 0 for discharge of cell
+        
+        p_i (float):    cell active power In/Out
+        v_cell (float): cell voltage
+        """
+        
+        if self.state == 'Operational':
+            icell = p_i/v_cell
+            if icell > self.cn * self.max_c_rate:
+                self.overload   = True
+                self.state      = 'Stand-by'
+                return 0
+            elif icell < -self.cn * self.max_c_rate:
+                self.overload   = True
+                self.state      = 'Stand-by'
+                return 0
+            else:
+                self.overload   = False
+                return icell
+        else:
+            return 0
+
+    def cell_voltage(self, y, t, icell):
+        """
+        Voltage cell and SOC is calculated as a result of a system of equations
+        as proposed by the equivalent circuit model according to XX
+
+        Returns cell voltage and SOC at time t 
+        -------
+        None.
+
+        """
+        
+        # CONSTANT PARAMETERS
+        # Two RC elements (parallel connection of resistor and capacitor):
+        # represent electrochemical reactions in each electrode of the cell
+        r1 = 0.078   # Resistance of first RC element [Ohm]
+        r2 = 0.078   # Resistance of second RC element [Ohm]
+        c1 = 2       # Capacity of first RC element [Ah]
+        c2 = 2       # Capacity of second RC element [Ah]
+    
+        # Vector of differentiable variables
+        Q, v1, v2, = y
+
+        # derivative of the vector y over time, which is the derivative 
+        # of each element over time (differential equations)
+        dydt = [
+            - icell,                     # dQ/dt
+            1/c1 * (icell - v1/r1) ,     # dV1/dt
+            1/c2 * (icell - v2/r2) ,     # dV1/dt
+        ]
+    
+        return dydt
+    
+    def process(self, p_kw, timestep):
+        
+        """
+        timestep is needed in seconds -> timesteps of more than 1 hour
+        may hinder the model of the physical process
+        """
+        
+        self.p_kw = p_kw
+        if p_kw == 0:
+            self.state = 'Stand-by'
+        rs = 0.078          # Serial resistance [Ohm]: ohmic resistance of cell
+        t  = np.linspace(1, timestep, timestep)
+        
+        if len(self.meta['SOC']) == 0:
+            Qo     = self.cn * 3600      # initial condition for Q
+            v_cell = self.cco
+        else:
+            Qo     = self.meta['Q'][-1]
+        if self.state == 'Stand-by':
+            v1o    = 0                   # initial condition for V1
+            v2o    = 0                   # initial condition for V2
+            if len(self.meta['SOC']) > 0:
+                v_cell = self.cco - (1.2 - Qo/(self.cn * 3600))
+        else:
+            v1o    = self.meta['V1'][-1] # initial condition for V1
+            v2o    = self.meta['V2'][-1] # initial condition for V2
+            v_cell = self.meta['Vcell'][-1]
+            
+        p_w             = p_kw*1000
+        p_i             = self.bms(v_cell, p_w)
+        icell           = self.icell(p_i, v_cell)
+        y0              = Qo, v1o, v2o
+        args            = (icell,)
+        sol             = odeint(self.cell_voltage, y0, t, args)
+        Qt, v1t, v2t    = sol[:,0], sol[:,1], sol[:,2]
+        soct            = Qt / (self.cn * 3600)
+        vs              = icell * rs
+        if self.state == 'Operational':
+            vot             = self.cco - (1.2 - soct)
+            v_cell          = vot - v1t - v2t - vs
+        else:
+            v_cell      = [v_cell]
+        if self.state in ['Fully charged', 'Depleted'] or self.overload:
+            sec         = 0
+        else:
+            sec         = timestep
+        
+        if np.max(soct) > 1.:
+            sec     = [i for (i,j) in enumerate(soct) if j > 1.][0]
+            v_cell  = [self.cco]
+            Qt      = [self.cn*3600]
+            v1t     = [0]
+            v2t     = [0]
+            soct    = [1.]
+        elif np.min(soct) < 0.:
+            sec     = [i for (i,j) in enumerate(soct) if j < 0.][0]
+            v_cell  = [self.dco]
+            Qt      = [0]
+            v1t     = [0]
+            v2t     = [0]
+            soct    = [0.]
+        # Store data
+        self.meta['P'].append(sec/timestep*p_kw)
+        self.meta['p_reject'].append(-p_kw*(1-sec/timestep))
+        self.meta['Q'].append(Qt[-1])
+        self.meta['V1'].append(v1t[-1])
+        self.meta['V2'].append(v2t[-1])
+        self.meta['Vcell'].append(v_cell[-1])
+        self.meta['SOC'].append(soct[-1]*100)
