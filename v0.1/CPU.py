@@ -6,7 +6,7 @@ Created on Sat Feb 29 20:13:35 2020
 """
 
 import pandas as pd
-from Storage import BatterySimple
+from Storage import BatterySimple, Battery
 from PVgen import PVgen
 
 class CPU(BatterySimple, PVgen):
@@ -119,15 +119,15 @@ class CPU(BatterySimple, PVgen):
                                          battery_capacity = self.battery_capacity,
                                          # signal         = self.signal,
                                          )
-        # elif self.b_type == "phys":
-        #     self.battery = Battery(
-        #                             ncells      = self.ncells,
-        #                             cn          = self.cn,
-        #                             vn          = self.vn,
-        #                             dco         = self.dco,
-        #                             cco         = self.cco,
-        #                             max_c_rate  = self.max_c_rate,
-        #                             )
+        elif self.b_type == "phys":
+            self.battery = Battery(
+                                    ncells      = self.ncells,
+                                    cn          = self.cn,
+                                    vn          = self.vn,
+                                    dco         = self.dco,
+                                    cco         = self.cco,
+                                    max_c_rate  = self.max_c_rate,
+                                    )
         self.pvgen  = PVgen(
                             pv_kw           = self.pv_kw,
                             num_panels      = self.num_panels,
