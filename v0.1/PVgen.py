@@ -77,8 +77,6 @@ class PVgen(object):
         self.pv_total_loss  = pv_total_loss
         self.module_area    = module_area
         self.oda_t          = oda_t
-        if self.pvgen.pv_kw != self.pv_kw:
-            self.pv_kw = self.pvgen.pv_kw
         self.meta           = {
                                'irr_sol'  : [],
                                # 'oda_t'    : [],
