@@ -138,6 +138,8 @@ class CPU(BatterySimple, PVgen):
                             module_area     = self.module_area,
                             oda_t           = self.oda_t,
                             )
+        if self.pvgen.pv_kw != self.pv_kw:
+            self.pv_kw = self.pvgen.pv_kw
         self.meta   = {
                        'timestamp'          : [],
                        'p_load'             : [],
