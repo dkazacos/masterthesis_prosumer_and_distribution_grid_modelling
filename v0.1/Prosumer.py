@@ -147,6 +147,8 @@ class Prosumer(CPU):
                                   module_area       = self.module_area,
                                   oda_t             = self.oda_t,
                                   )
+        if self.cpu.pvgen.pv_kw != self.pv_kw:
+            self.pv_kw = self.cpu.pvgen.pv_kw
         self.battery        = self.cpu.battery
         self.pvgen          = self.cpu.pvgen
         self.meta           = self.cpu.meta
