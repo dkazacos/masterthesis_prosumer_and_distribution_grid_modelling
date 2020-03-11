@@ -8,6 +8,7 @@ Created on Sat Feb 29 20:12:09 2020
 import math
 import decimal
 import pandas as pd
+import warnings
 
 class PVgen(object):
     
@@ -90,7 +91,7 @@ class PVgen(object):
                 self.num_panels = math.floor(self.roof_area / self.module_area)
                 self.pv_kw = self.num_panels * self.panel_peak_p
             else:
-                print('Missing args: see PVgen class documentation. Need pv_kw, num_panels or roof_area')
+                warnings.warn('Missing args: see PVgen class documentation. Need pv_kw, num_panels or roof_area')
         elif self.pv_kw and not self.num_panels:
             if self.pv_kw < 0:
                 raise AttributeError('PV installed power cannot be a negative number')
@@ -100,7 +101,7 @@ class PVgen(object):
             if decimal.Decimal('%s' % self.pv_kw) % decimal.Decimal('%s' % self.panel_peak_p) != 0:
                 self.num_panels = math.ceil(self.pv_kw / self.panel_peak_p)
                 self.pv_kw = self.num_panels * self.panel_peak_p
-                raise Warning('Module characteristics require chosen PVgen installed power to be adjusted to %s kW. See class default args' % self.pv_kw)
+                warnings.warn('Module characteristics require chosen PVgen installed power to be adjusted to %s kW. See class default args' % self.pv_kw)
             else:
                 self.num_panels = self.pv_kw / self.panel_peak_p
         
