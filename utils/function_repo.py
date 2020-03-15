@@ -7,6 +7,12 @@ Created on Mon Feb 17 21:55:22 2020
 
 import pandas as pd
 
+def parse_hours(data):
+    """
+    Converts hours 0..24 to 0..23
+    """
+    data.index=data.index.str.replace('24:','00:')
+
 def timegrid(data):
     """
     Extracts time step (in seconds) from the time grid property of data.
