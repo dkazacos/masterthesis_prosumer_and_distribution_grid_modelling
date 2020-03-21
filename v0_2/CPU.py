@@ -224,7 +224,7 @@ class CPU(BatterySimple, PVgen):
             self.meta['battery_status'].append(1)
             self.meta['log'].append('surplus absorbed by battery. No grid flow')
 
-    def active(self, irrad_data, load_data):
+    def run_static_sim(self, irrad_data, load_data):
         """
         Runs the data transfer at every timestamp of the simulation. This
         method calls CPU's control and runs throughout full length load
@@ -320,10 +320,10 @@ if __name__ == "__main__":
     #             **META,
     #             )
 
-    # psimp.active(
-    #             irrad_data = irrad_data,
-    #             load_data = load_demand,
-    #             )
+    # psimp.run_static_sim(
+    #                   irrad_data = irrad_data,
+    #                   load_data = load_demand,
+    #                   )
 
     timestep = timegrid(irrad_data)
     for i, (irr, ld) in enumerate(zip(irrad_data, load_demand)):
@@ -334,9 +334,9 @@ if __name__ == "__main__":
                         timestamp   = load_demand.index[i],
                         )
 
-    # pphys.active(
-    #             irrad_data = irrad_data,
-    #             )
+    # pphys.run_static_sim(
+    #                     irrad_data = irrad_data,
+    #                     )
 
     prosumer_dict = {}
     prosumer_dict['res_simp'] = psimp.get_cpu_data()
