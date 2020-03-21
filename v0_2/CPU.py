@@ -153,7 +153,7 @@ class CPU(BatterySimple, PVgen):
         """
         Returns pandas dataframe composed by object's meta dictionary of data
         """
-        return pd.DataFrame(self.meta, index=self.meta['timestamp'])
+        return pd.DataFrame(self.meta)
   
     def add_timestamp(self, timestamp):
         """
