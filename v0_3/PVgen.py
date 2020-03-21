@@ -62,7 +62,6 @@ class PVgen(object):
                  roof_area      = None,
                  pv_total_loss  = 0.0035,
                  module_area    = 1.96,
-                 # oda_t          = None,
                  ):
 
         self.pv_kw          = pv_kw
@@ -72,10 +71,8 @@ class PVgen(object):
         self.roof_area      = roof_area
         self.pv_total_loss  = pv_total_loss
         self.module_area    = module_area
-        # self.oda_t          = oda_t
         self.meta           = {
                                'irr_sol'  : [],
-                               # 'oda_t'    : [],
                                }
         if not self.pv_kw:
             if self.num_panels:
@@ -99,30 +96,30 @@ class PVgen(object):
                 self._readjust_pv_kw()
             else:
                 self.num_panels = self.pv_kw / self.panel_peak_p
-    
+
     def _readjust_pv_kw(self, verbose=False):
         if verbose:
             warnings.warn('Module characteristics require chosen PVgen installed power to be adjusted to %s kW. See class default args' % self.pv_kw)
         self.pv_kw = self.num_panels * self.panel_peak_p
-        
+
     def get_installed_pv(self):
         """
         Returns the PV installed power in kW
         """
         return self.pv_kw
-    
+
     def get_pv_sys_loss(self):
         """
         Returns the PV total power loss in per unit
         """
         return self.pv_total_loss
-    
+
     def get_pv_data(self):
         """
         Returns pandas dataframe composed by object's meta dictionray of data
         """
         return pd.DataFrame(self.meta)
-    
+
     def production(self, irr_sol, timestep):
         """
         A simple model of the PV power pordocution is executed by this function

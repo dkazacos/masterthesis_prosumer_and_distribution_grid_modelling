@@ -10,11 +10,11 @@ sys.path.append('..')
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from Prosumer import Prosumer
+from CPU import CPU
+from utils.function_repo import parse_hours, timegrid
 
 # ========================================================================
 # MAIN
-
 # Data preparation
 # Import irradiance test data
 irr = pd.read_csv(
@@ -32,9 +32,13 @@ load_data = pd.read_csv(
                         parse_dates        = [1],
                         index_col          = 0,
                         )
-load_data.index = pd.to_datetime(load_data.index) + pd.Timedelta(minutes=1)
-irrad_data      = irr.iloc[:, 3]
+# Convert 0..24:00 hours to 0..23:59
+parse_hours(irr)
+load_data.index = pd.to_datetime(load_data.index, dayfirst=True) + pd.Timedelta(minutes=1)
 load_demand     = load_data.iloc[:, 0]
+irrad_data      = irr.iloc[:, 3]
+irrad_data.index= pd.to_datetime(irrad_data.index) + pd.DateOffset(years=10)
+
 if any(',' in string for string in load_demand):
     load_demand = load_demand.str.replace(',', '.')
     load_demand = 30*pd.to_numeric(load_demand)
@@ -43,30 +47,40 @@ if any(',' in string for string in load_demand):
 # Test model and get results
 META = {
         'pv_kw'         : 2.1,
-        'load_demand'   : load_demand,
         }
-psimp = Prosumer(
-                 b_type             = 'linear',
-                 battery_capacity   = 3.5,
-                 **META,
-                 )
-
-# pphys = Prosumer(
-#                 b_type = 'phys',
-#                 ncells = 1000,
-#                 **META,
-#                 )
-
-psimp.active(
-            irrad_data = irrad_data,
+psimp = CPU(
+            b_type             = 'linear',
+            battery_capacity   = 3.5,
+            **META,
             )
 
-# pphys.active(
-#             irrad_data = irrad_data,
+# pphys = CPU(
+#             b_type = 'phys',
+#             ncells = 1000,
+#             **META,
 #             )
+
+# psimp.run_static_sim(
+#                   irrad_data = irrad_data,
+#                   load_data = load_demand,
+#                   )
+
+timestep = timegrid(irrad_data)
+for i, (irr, ld) in enumerate(zip(irrad_data, load_demand)):
+    psimp.run_pflow(
+                    irrad_data  = irr,
+                    load_data   = ld,
+                    timestep    = timestep,
+                    timestamp   = load_demand.index[i],
+                    )
+
+# pphys.run_static_sim(
+#                     irrad_data = irrad_data,
+#                     )
 
 prosumer_dict = {}
 prosumer_dict['res_simp'] = psimp.get_cpu_data()
+prosumer_dict['res_simp'].set_index('timestamp', inplace=True)
 # prosumer_dict['res_phys'] = pphys.get_cpu_data()
 
 # ========================================================================
