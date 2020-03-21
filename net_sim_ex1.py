@@ -8,7 +8,7 @@ Created on Mon Mar  9 10:05:26 2020
 import os
 import sys
 import random
-sys.path.append(os.getcwd()+'\\v0_2')
+sys.path.append(os.getcwd()+'\\v0_3')
 
 import pandapower as pp
 from pandapower import timeseries as ts
@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 import time
 
-from v0_2.CPU import CPU
+from v0_3.CPU import CPU
 from utils.function_repo import parse_hours, timegrid
 
 # ============================================================================
