@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from CPU import CPU
+from utils.function_repo import parse_hours, timegrid
 
 # ========================================================================
 # MAIN
