@@ -54,10 +54,7 @@ class CPU(BatterySimple, PVgen):
     module_area : float, default 1.96 m2
         area of a single solar panel
 
-    oda_t : float, default None
-        outdoor air temperature data. Power output dependency on outdoor
-        temperature is not yet defined.
-        
+
     Return
     ----------
 
@@ -88,7 +85,7 @@ class CPU(BatterySimple, PVgen):
                   roof_area         = None,
                   pv_total_loss     = 0.0035,
                   module_area       = 1.96,
-                  oda_t             = None,
+                  # oda_t             = None,
                   ):
 
         # self.p_pv             = p_pv
@@ -112,7 +109,7 @@ class CPU(BatterySimple, PVgen):
         self.roof_area          = roof_area
         self.pv_total_loss      = pv_total_loss
         self.module_area        = module_area
-        self.oda_t              = oda_t
+        # self.oda_t              = oda_t
         if self.b_type == "linear":
             self.battery = BatterySimple(
                                          # p_kw           = self.p_kw,
@@ -136,7 +133,7 @@ class CPU(BatterySimple, PVgen):
                             roof_area       = self.roof_area,
                             pv_total_loss   = self.pv_total_loss,
                             module_area     = self.module_area,
-                            oda_t           = self.oda_t,
+                            # oda_t           = self.oda_t,
                             )
         if self.pvgen.pv_kw != self.pv_kw:
             self.pv_kw = self.pvgen.pv_kw
