@@ -265,7 +265,7 @@ if __name__ == "__main__":
                         irr = irr,
                         load= ld,
                         timestep=timestep,
-                        timestamp=psimp.load_demand[i],
+                        timestamp=psimp.load_demand.index[i],
                         )
 
     # pphys.active(
@@ -274,6 +274,7 @@ if __name__ == "__main__":
 
     prosumer_dict = {}
     prosumer_dict['res_simp'] = psimp.get_cpu_data()
+    prosumer_dict['res_simp'].set_index('timestamp', inplace=True)
     # prosumer_dict['res_phys'] = pphys.get_cpu_data()
 
     # ========================================================================
