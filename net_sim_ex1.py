@@ -15,8 +15,10 @@ from pandapower import timeseries as ts
 from pandapower import control
 import pandas as pd
 import numpy as np
+import time
 
 from v0_2.Prosumer import Prosumer
+from utils.function_repo import parse_hours, timegrid
 
 # ============================================================================
 # Create NETWORK
@@ -53,8 +55,8 @@ def simple_net():
                                           shift_degree=150, name='MV-LV-Trafo')
     for ind in range(1,13):
         pp.create_load(net, bus=ind,
-                       p_mw=0.01,
-                       name='Prosumer %s' % ind)
+                        p_mw=0.0025,
+                        name='Prosumer %s' % ind)
     return net
 
 def import_data():
@@ -73,9 +75,12 @@ def import_data():
                             parse_dates        = [1],
                             index_col          = 0,
                             )
-    load_data.index = pd.to_datetime(load_data.index) + pd.Timedelta(minutes=1)
-    irrad_data      = irr.iloc[:, 3]
+    # Convert 0..24:00 hours to 0..23:59
+    parse_hours(irr)
+    load_data.index = pd.to_datetime(load_data.index, dayfirst=True) + pd.Timedelta(minutes=1)
     load_demand     = load_data.iloc[:, 0]
+    irrad_data      = irr.iloc[:, 3]
+    irrad_data.index= pd.to_datetime(irrad_data.index) + pd.DateOffset(years=10)
     if any(',' in string for string in load_demand):
         load_demand = load_demand.str.replace(',', '.')
         load_demand = 30*pd.to_numeric(load_demand)
@@ -87,7 +92,7 @@ def neighborhood(net):
     _, load_demand = import_data()
     neighborhood = {}
     for b in net.bus.index[1:]:
-    
+
         # Generate a variation of a prosumer load of +/- 30 %
         ft = random.randint(1,30)/100
         ld = load_demand*(1-ft)
@@ -101,19 +106,54 @@ def neighborhood(net):
         p = Prosumer(**META)
         # Store Prosumer X in Neighborhood dictionary
         neighborhood['Prosumer %s in %s' % (b, net.bus.name[b])] = p
-    
+
     return neighborhood
+
+# Create loads
+irr, load = import_data()
+timestep = timegrid(load)
 
 net = simple_net()
 nh = neighborhood(net)
+now=time.time()
+t           = []
+th_overload = pd.DataFrame()
+vm_pu_bus   = pd.DataFrame()
+slack_p     = pd.DataFrame()
+# Run stepwise simulation extracting load and irradiation
+for i, (ir, ld) in enumerate(zip(irr[960:1200], load[960:1200])):
+    print('new iteration', i)
+    
+    # Instantiate a controller unit for each Prosumer's load
+    for j, (key, val) in enumerate(nh.items()):
+        d = pd.DataFrame(index=[0])
+        val.run_pflow(ir, ld, timestep, timestamp=irr.index[i])
+        d[key] = -val.get_cpu_data()['p_grid_flow'][0]/1000
+        # sources[key] = p_grid
+        ds = ts.DFData(d)
+        # ds = ts.DFData(df)
+        control.ConstControl(net, element='load',
+                             element_index=[j],
+                             variable='p_mw',  data_source=ds,
+                             profile_name=[key])
 
-# Create loads
-for pr, ind in zip(nh.keys(), net.bus.index[1:]):
-    pp.create_load(net, bus=ind,
-                   p_mw=nh[pr].pv_kw/1000,
-                   name=pr[:9+len(str(ind))])
+    # Run power flow calculation at every timestep iteration
+    mid = time.time()
+    ts.run_timeseries(net, verbose=False)
+
+    # Store line overload, voltage at buses and slack power balance
+    t.append(irr.index[i])
+    th_overload = th_overload.append(net.res_line.loading_percent.transpose())
+    vm_pu_bus = vm_pu_bus.append(net.res_bus.vm_pu.transpose())
+    slack_p = slack_p.append(net.res_ext_grid.p_mw)
+    print('Time since beginning of simulation: ', time.time() - now)
+    
+# for pr, ind in zip(nh.keys(), net.bus.index[1:]):
+#     pp.create_load(net, bus=ind,
+#                    p_mw=nh[pr].pv_kw/1000,
+#                    name=pr[:9+len(str(ind))])
 
 # ============================================================================
 # Run Net POWERFLOW
-pp.runpp(net)
-print(net.res_line)
+# pp.runpp(net)
+# print(net.res_line)
