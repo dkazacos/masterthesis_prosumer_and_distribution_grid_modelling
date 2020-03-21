@@ -60,7 +60,6 @@ class Prosumer(CPU):
     module_area : float, default 1.96 m2
         area of a single solar panel
 
-
     Return
     ----------
     
@@ -69,16 +68,11 @@ class Prosumer(CPU):
     signal = 'self-consumption'
 
     def __init__(self,
-                 # irrad_data       = None,
                  load_demand        = None,
-                 # p_pv             = None,
-                 # p_load           = None,
                  b_type             = 'linear',
                  switch_b           = None,
                  switch_pv          = None,
-                 # p_kw             = None,
                  battery_capacity   = 7.5,
-                 # signal           = None,
                  ncells             = 1000,
                  cn                 = 2.55,
                  vn                 = 3.7,
@@ -92,19 +86,13 @@ class Prosumer(CPU):
                  roof_area          = None,
                  pv_total_loss      = 0.0035,
                  module_area        = 1.96,
-                 # oda_t              = None,
                  ):
 
-        # self.irrad_data       = irrad_data
         self.load_demand        = load_demand
-        # self.p_pv             = p_pv
-        # self.p_load           = p_load
         self.b_type             = b_type
         self.switch_b           = switch_b
         self.switch_pv          = switch_pv
-        # self.p_kw             = p_kw
         self.battery_capacity   = battery_capacity
-        # self.signal           = signal
         self.ncells             = ncells
         self.cn                 = cn
         self.vn                 = vn
@@ -118,17 +106,12 @@ class Prosumer(CPU):
         self.roof_area          = roof_area
         self.pv_total_loss      = pv_total_loss
         self.module_area        = module_area
-        # self.oda_t              = oda_t
 
         self.cpu            = CPU(
-                                  # p_pv            = self.p_pv,
-                                  # p_load          = self.p_load,
                                   b_type            = self.b_type,
                                   switch_b          = self.switch_b,
                                   switch_pv         = self.switch_pv,
-                                  # p_kw            = self.p_kw,
                                   battery_capacity  = self.battery_capacity,
-                                  # signal          = self.signal,
                                   ncells            = self.ncells,
                                   cn                = self.cn,
                                   vn                = self.vn,
@@ -142,16 +125,12 @@ class Prosumer(CPU):
                                   roof_area         = self.roof_area,
                                   pv_total_loss     = self.pv_total_loss,
                                   module_area       = self.module_area,
-                                  # oda_t             = self.oda_t,
                                   )
         if self.cpu.pvgen.pv_kw != self.pv_kw:
             self.pv_kw = self.cpu.pvgen.pv_kw
         self.battery        = self.cpu.battery
         self.pvgen          = self.cpu.pvgen
         self.meta           = self.cpu.meta
-
-    # def get_irrad_data(self):
-    #     return self.irrad_data
 
     def get_load_demand(self):
         """

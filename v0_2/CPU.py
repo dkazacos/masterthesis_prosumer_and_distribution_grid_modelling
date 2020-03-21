@@ -13,12 +13,12 @@ from Storage import BatterySimple, Battery
 from PVgen import PVgen
 
 class CPU(BatterySimple, PVgen):
-    
+
     """
     Control process unit allows for data transfer throughout the prosumer
     simulation. Control unit for power flow from/to the battery and from/to 
     the grid.
-    
+
     This class fully characterizes a single Prosumer
 
     Parameters
@@ -63,19 +63,15 @@ class CPU(BatterySimple, PVgen):
     ----------
 
     """
-    
+
     signal   = 'self-consumption'   # also: 'grid high voltage', 'reactive feed-in'
     strategy = 'pv-priority'        # also: 'grid-friendly', 'cooperative'
 
     def __init__(self,
-                  # p_pv            = None,
-                  # p_load          = None,
                   b_type            = 'linear',
                   switch_b          = None,
                   switch_pv         = None,
-                  # p_kw            = None,
                   battery_capacity  = 7.5,
-                  # signal          = None,
                   ncells            = 1000,
                   cn                = 2.55,
                   vn                = 3.7,
@@ -89,17 +85,12 @@ class CPU(BatterySimple, PVgen):
                   roof_area         = None,
                   pv_total_loss     = 0.0035,
                   module_area       = 1.96,
-                  # oda_t             = None,
                   ):
 
-        # self.p_pv             = p_pv
-        # self.p_load           = p_load
         self.b_type             = b_type
         self.switch_b           = switch_b
         self.switch_pv          = switch_pv
-        # self.p_kw             = p_kw
         self.battery_capacity   = battery_capacity
-        # self.signal           = signal
         self.ncells             = ncells
         self.cn                 = cn
         self.vn                 = vn
@@ -113,12 +104,9 @@ class CPU(BatterySimple, PVgen):
         self.roof_area          = roof_area
         self.pv_total_loss      = pv_total_loss
         self.module_area        = module_area
-        # self.oda_t              = oda_t
         if self.b_type == "linear":
             self.battery = BatterySimple(
-                                         # p_kw           = self.p_kw,
                                          battery_capacity = self.battery_capacity,
-                                         # signal         = self.signal,
                                          )
         elif self.b_type == "phys":
             self.battery = Battery(
@@ -137,7 +125,6 @@ class CPU(BatterySimple, PVgen):
                             roof_area       = self.roof_area,
                             pv_total_loss   = self.pv_total_loss,
                             module_area     = self.module_area,
-                            # oda_t           = self.oda_t,
                             )
         if self.pvgen.pv_kw != self.pv_kw:
             self.pv_kw = self.pvgen.pv_kw
@@ -152,13 +139,13 @@ class CPU(BatterySimple, PVgen):
                        'grid_status'        : [],
                        'log'                : [],
                        }
-    
+
     def get_cpu_data(self):
         """
         Returns pandas dataframe composed by object's meta dictionary of data
         """
         return pd.DataFrame(self.meta)
-  
+
     def add_timestamp(self, timestamp):
         """
         Extracts the datetime string at every time step of the simulation and
@@ -171,12 +158,12 @@ class CPU(BatterySimple, PVgen):
             number of seconds between every time step of the simulation
         """
         self.meta['timestamp'].append(timestamp)
-    
+
     def control(self, irr_sun, p_load, timestep):
         """
         Function that dictates the behavior of the power flow among the
         components of a Prosumer object and in relationship with the grid
-        
+
         Parameters
         ----------
         irr_sun : float, default None
@@ -189,7 +176,7 @@ class CPU(BatterySimple, PVgen):
         timestep : float, default None
             number of seconds between every time step of the simulation
         """        
-        
+
         p_pv    = self.pvgen.production(irr_sun, timestep)
         p_flow  = p_load - p_pv
         self.battery.process(p_flow, timestep)

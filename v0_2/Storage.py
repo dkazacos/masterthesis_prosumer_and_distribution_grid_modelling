@@ -31,16 +31,12 @@ class BatterySimple(object):
     state   = 'Fully charged'
     signal  = 'self-consumption'
     p_kw    = None
-    
+
     def __init__(self,
-                 # p_kw             = None,
                  battery_capacity   = 7.5,
-                 # signal           = None,
                  ):
 
-        # self.p_kw             = p_kw                  # power exchange [kW] (< 0 charging)
         self.battery_capacity   = battery_capacity      # capacity of battery [kWh]
-        # self.signal           = signal                # resembles signals from outside
         self.meta               = {
                                    'P'          : [],   # dictionary of data
                                    'p_reject'   : [],   # rejected by battery
@@ -49,7 +45,7 @@ class BatterySimple(object):
                                    }
         if self.battery_capacity < 0:
             raise AttributeError('Battery capacity cannot be a negative number')
-    
+
     def get_battery_soc(self):
         """
         Returns the battery state of charge in %
@@ -58,25 +54,25 @@ class BatterySimple(object):
             return 100
         else:
             return self.meta['SOC'][-1]
-    
+
     def get_battery_state(self):
         """
         Returns the current state of a battery instance as a string log
         """
         return self.state
-    
+
     def get_battery_data(self):
         """
         Returns a pandas dataframe composed by object's meta dictionary
         """
         return pd.DataFrame(self.meta)
-    
+
     def get_battery_capacity(self):
         """
         Returns the battery capacity in kWh
         """
         return self.battery_capacity
-    
+
     def bms(self):
         """
         Battery Management System (BMS). Dictates the acceptance of
@@ -94,9 +90,9 @@ class BatterySimple(object):
                 return self.p_kw
         elif self.p_kw == 0:
             return self.p_kw
-    
+
     def process(self, p_kw, timestep):
-        
+
         """
         Populates an object's meta dictionary with data comming from the
         power flow through the battery after BMS filtering
@@ -106,7 +102,7 @@ class BatterySimple(object):
         st          = self.get_battery_state()
         p           = self.bms()
         c           = self.battery_capacity
-        
+
         if p > 0: # discharge battery
             if len(self.meta['SOC']) == 0:
                 Q = c - p*h
@@ -145,7 +141,7 @@ class BatterySimple(object):
                 self.meta['P'].append(p)
                 self.meta['SOC'].append(Q/c*100)
                 self.meta['log'].append('charging')
-        
+
         elif p == 0: # no flow in/out battery
             if st == 'Fully charged':
                 self.meta['SOC'].append(100)
@@ -162,20 +158,20 @@ class BatterySimple(object):
             self.meta['log'].append('No power flow through battery')
 
 class Battery(object):
-    
+
     state       = 'Stand-by'
     signal      = 'self-consumption'
     overload    = False
     p_kw        = None
-    
+
     def __init__(self, ncells=1000, cn=2.55, vn=3.7, dco=3.0, cco=4.2, max_c_rate=10):
-        
+
         """
         Default properties of battery cell: Li-ion CGR18650E Panasonic
-        
+
         Hint: Initial state of charge = 100%
         """
-        
+
         # self.p_kw     = p_kw          # power exchange [kW]
         self.ncells     = ncells        # number of cells in battery pack
         self.cn         = cn            # nominal capacity of Li.ion cell [Ah]
@@ -194,7 +190,7 @@ class Battery(object):
         # self.signal                = signal    # resembles signals from outside
 
     # =========================================================================
-    
+
     # @property
     # def cn(self):
     #     return self._nominal_cell_capacity
@@ -208,14 +204,14 @@ class Battery(object):
     # @vn.setter
     # def vn(self, voltage):
     #     self._nominal_cell_voltage = voltage
-        
+
     # @property
     # def dco(self):
     #     return self._discharge_cov
     # @dco.setter
     # def dco(self, dicoff):
     #     self._discharge_cov = dicoff
-    
+
     # @property
     # def cco(self):
     #     return self._charge_cov
@@ -230,36 +226,36 @@ class Battery(object):
             return 100 # TODO! Try include parameter for user on this topic
         else:
             return self.meta['SOC'][-1]
-        
+
     def get_state(self):
         return self.state
-    
+
     def get_capacity(self):
         return self.cn
-    
+
     def get_ccov(self):
         return self.cco
-    
+
     def get_dcov(self):
         return self.dco
-    
+
     def get_rated_energy_wh(self):
         return self.cn*self.vn*self.ncells
-    
+
     def get_data(self):
         return pd.DataFrame(self.meta)
-    
+
     def get_ncells(self):
         return self.ncells
-    
+
     def bms(self, v_cell, p_w):
         """
         Battery Management System. Defines safety operation of battery
         charge and discharge
-            
+
         p_w (float):   power demand/supply. External signal
         v_cell (float): cell voltage
-        
+
         Returns cell active power In/Out
         """
 
@@ -271,7 +267,7 @@ class Battery(object):
                 self.state = 'Fully charged'
                 # TODO! place-holder for switch
                 return 0
-            
+
         elif p_w/self.ncells > 0:
             if v_cell > self.dco:
                 self.state = 'Operational'
@@ -288,11 +284,11 @@ class Battery(object):
         """
         Icell < 0 for charge of cell
         Icell > 0 for discharge of cell
-        
+
         p_i (float):    cell active power In/Out
         v_cell (float): cell voltage
         """
-        
+
         if self.state == 'Operational':
             icell = p_i/v_cell
             if icell > self.cn * self.max_c_rate:
@@ -319,7 +315,7 @@ class Battery(object):
         None.
 
         """
-        
+
         # CONSTANT PARAMETERS
         # Two RC elements (parallel connection of resistor and capacitor):
         # represent electrochemical reactions in each electrode of the cell
@@ -327,7 +323,7 @@ class Battery(object):
         r2 = 0.078   # Resistance of second RC element [Ohm]
         c1 = 2       # Capacity of first RC element [Ah]
         c2 = 2       # Capacity of second RC element [Ah]
-    
+
         # Vector of differentiable variables
         Q, v1, v2, = y
 
@@ -338,22 +334,22 @@ class Battery(object):
             1/c1 * (icell - v1/r1) ,     # dV1/dt
             1/c2 * (icell - v2/r2) ,     # dV1/dt
         ]
-    
+
         return dydt
-    
+
     def process(self, p_kw, timestep):
-        
+
         """
         timestep is needed in seconds -> timesteps of more than 1 hour
         may hinder the model of the physical process
         """
-        
+
         self.p_kw = p_kw
         if p_kw == 0:
             self.state = 'Stand-by'
         rs = 0.078          # Serial resistance [Ohm]: ohmic resistance of cell
         t  = np.linspace(1, timestep, timestep)
-        
+
         if len(self.meta['SOC']) == 0:
             Qo     = self.cn * 3600      # initial condition for Q
             v_cell = self.cco
@@ -368,7 +364,7 @@ class Battery(object):
             v1o    = self.meta['V1'][-1] # initial condition for V1
             v2o    = self.meta['V2'][-1] # initial condition for V2
             v_cell = self.meta['Vcell'][-1]
-            
+
         p_w             = p_kw*1000
         p_i             = self.bms(v_cell, p_w)
         icell           = self.icell(p_i, v_cell)
@@ -387,7 +383,7 @@ class Battery(object):
             sec         = 0
         else:
             sec         = timestep
-        
+
         if np.max(soct) > 1.:
             sec     = [i for (i,j) in enumerate(soct) if j > 1.][0]
             v_cell  = [self.cco]
