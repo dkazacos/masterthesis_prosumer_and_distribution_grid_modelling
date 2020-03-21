@@ -96,11 +96,11 @@ class PVgen(object):
                     raise AttributeError('Invalid PVgen installed power. Not enough roof area for given module characteritics to yield %s kW. Reduce PV installed power or increase roof area' % self.pv_kw)
             if decimal.Decimal('%s' % self.pv_kw) % decimal.Decimal('%s' % self.panel_peak_p) != 0:
                 self.num_panels = math.ceil(self.pv_kw / self.panel_peak_p)
-                self.readjust_pv_kw()
+                self._readjust_pv_kw()
             else:
                 self.num_panels = self.pv_kw / self.panel_peak_p
     
-    def readjust_pv_kw(self, verbose=False):
+    def _readjust_pv_kw(self, verbose=False):
         if verbose:
             warnings.warn('Module characteristics require chosen PVgen installed power to be adjusted to %s kW. See class default args' % self.pv_kw)
         self.pv_kw = self.num_panels * self.panel_peak_p
