@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 import time
 
-from v0_2.Prosumer import Prosumer
+from v0_2.CPU import CPU
 from utils.function_repo import parse_hours, timegrid
 
 # ============================================================================
@@ -103,7 +103,7 @@ def neighborhood(net):
         META['load_demand']         = ld
         META['pv_kw']               = pk*0.7
         META['battery_capacity']    = 3.5
-        p = Prosumer(**META)
+        p = CPU(**META)
         # Store Prosumer X in Neighborhood dictionary
         neighborhood['Prosumer %s in %s' % (b, net.bus.name[b])] = p
 
