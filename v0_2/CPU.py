@@ -4,8 +4,11 @@ Created on Sat Feb 29 20:13:35 2020
 
 @author: Seta
 """
-
+import sys
+sys.path.append('..')
 import pandas as pd
+import matplotlib.pyplot as plt
+from utils.function_repo import timegrid, parse_hours
 from Storage import BatterySimple, Battery
 from PVgen import PVgen
 
@@ -14,7 +17,9 @@ class CPU(BatterySimple, PVgen):
     """
     Control process unit allows for data transfer throughout the prosumer
     simulation. Control unit for power flow from/to the battery and from/to 
-    the grid
+    the grid.
+    
+    This class fully characterizes a single Prosumer
 
     Parameters
     ----------
@@ -53,7 +58,6 @@ class CPU(BatterySimple, PVgen):
 
     module_area : float, default 1.96 m2
         area of a single solar panel
-
 
     Return
     ----------
@@ -219,3 +223,137 @@ class CPU(BatterySimple, PVgen):
             self.meta['grid_status'].append(0)
             self.meta['battery_status'].append(1)
             self.meta['log'].append('surplus absorbed by battery. No grid flow')
+
+    def active(self, irrad_data, load_data):
+        """
+        Runs the data transfer at every timestamp of the simulation. This
+        method calls CPU's control and runs throughout full length load
+        demanad and irradiation data statically
+        
+        Parameters
+        ----------
+        irrad_data : pandas Series, default None
+            time series of irradiation data that will be passed to the PV
+            installation in Wh/m2
+        """
+
+        timestep = timegrid(irrad_data)
+        i        = 0
+        while self.signal =='self-consumption':
+            irr_sun = irrad_data.iloc[i]
+            p_load  = load_demand.iloc[i]
+            self.control(irr_sun, p_load, timestep)
+            self.add_timestamp(irrad_data.index[i])
+            i += 1
+            if i >= len(irrad_data) or i >= len(load_demand):
+                self.signal = 'ended'
+                break
+            # TODO! introduce logic for variation of signals
+
+    def run_pflow(self, irrad_data, load_data, timestep, timestamp):
+        """
+        Runs the data transfer at a given timestamp of the simulation. This
+        method calls CPU's control in a discrete fashion and allows for
+        breaking and continuing the process given external signals
+        
+        Parameters
+        ----------
+        irrad_data : float, default None
+            solar irradiation at a given time step of the simulation in Wh/m2
+
+        load_data : float, default None
+            power requirements of Prosumer at a given time step of the
+            simulation in kWh during timestep time
+
+        timestep : float, default None
+            number of seconds between every time step of the simulation
+        """
+        if self.signal == 'self-consumption':
+            self.add_timestamp(timestamp)
+            return self.control(irrad_data, load_data, timestep)
+
+if __name__ == "__main__":
+
+    # ========================================================================
+    # Data preparation
+    # Import irradiance test data
+    irr = pd.read_csv(
+                      filepath_or_buffer = '../data/1minIntSolrad-07-2006.csv',
+                      sep                = ';',
+                      skiprows           = 25,
+                      parse_dates        = [[0,1]],
+                      index_col          = 0,
+                      )
+    # Import load_profile test data
+    load_data = pd.read_csv(
+                            filepath_or_buffer = '../data/1MinIntSumProfiles-Apparent-2workingpeople.csv',
+                            sep                = ';',
+                            usecols            = [1,2],
+                            parse_dates        = [1],
+                            index_col          = 0,
+                            )
+    # Convert 0..24:00 hours to 0..23:59
+    parse_hours(irr)
+    load_data.index = pd.to_datetime(load_data.index, dayfirst=True) + pd.Timedelta(minutes=1)
+    load_demand     = load_data.iloc[:, 0]
+    irrad_data      = irr.iloc[:, 3]
+    irrad_data.index= pd.to_datetime(irrad_data.index) + pd.DateOffset(years=10)
+
+    if any(',' in string for string in load_demand):
+        load_demand = load_demand.str.replace(',', '.')
+        load_demand = 30*pd.to_numeric(load_demand)
+
+    # ========================================================================
+    # Test model and get results
+    META = {
+            'pv_kw'         : 2.1,
+            }
+    psimp = CPU(
+                b_type             = 'linear',
+                battery_capacity   = 3.5,
+                **META,
+                )
+
+    # pphys = CPU(
+    #             b_type = 'phys',
+    #             ncells = 1000,
+    #             **META,
+    #             )
+
+    # psimp.active(
+    #             irrad_data = irrad_data,
+    #             load_data = load_demand,
+    #             )
+
+    timestep = timegrid(irrad_data)
+    for i, (irr, ld) in enumerate(zip(irrad_data, load_demand)):
+        psimp.run_pflow(
+                        irrad_data  = irr,
+                        load_data   = ld,
+                        timestep    = timestep,
+                        timestamp   = load_demand.index[i],
+                        )
+
+    # pphys.active(
+    #             irrad_data = irrad_data,
+    #             )
+
+    prosumer_dict = {}
+    prosumer_dict['res_simp'] = psimp.get_cpu_data()
+    prosumer_dict['res_simp'].set_index('timestamp', inplace=True)
+    # prosumer_dict['res_phys'] = pphys.get_cpu_data()
+
+    # ========================================================================
+    # Show some results
+    for val in prosumer_dict.values():
+        fig, ax = plt.subplots(figsize=(12,12))
+
+        ax.plot(val.p_load[720:960], 'orange', label='load')
+        ax.plot(val.p_pv[720:960], 'r', label='pv')
+        ax.plot(val.p_battery_flow[720:960], 'g', label='batt')
+        ax.plot(val.p_grid_flow[720:960], 'b', label='grid')
+        start, end = ax.get_xlim()
+        ax.xaxis.set_ticks(np.arange(start, end, 10))
+        fig.autofmt_xdate()
+        ax.legend()
+        plt.title('Power flow during 1st simulated day', fontsize=18)
