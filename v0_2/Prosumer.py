@@ -10,7 +10,7 @@ sys.path.append('..')
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from utils.function_repo import timegrid
+from utils.function_repo import timegrid, parse_hours
 from CPU import CPU
 
 class Prosumer(CPU):
@@ -165,8 +165,8 @@ class Prosumer(CPU):
     def active(self, irrad_data):
         """
         Runs the data transfer at every timestamp of the simulation. This
-        method calls CPU's control in a discrete fashion and allows for
-        breaking and continuing the process given external signals
+        method calls CPU's control and runs throughout full length load
+        demanad and irradiation data statically
         
         Parameters
         ----------
@@ -187,6 +187,28 @@ class Prosumer(CPU):
                 self.signal = 'ended'
                 break
             # TODO! introduce logic for variation of signals
+ 
+    def run_pflow(self, irr, load, timestep, timestamp):
+        """
+        Runs the data transfer at a given timestamp of the simulation. This
+        method calls CPU's control in a discrete fashion and allows for
+        breaking and continuing the process given external signals
+        
+        Parameters
+        ----------
+        irr : float, default None
+            solar irradiation at a given time step of the simulation in Wh/m2
+
+        load : float, default None
+            power requirements of Prosumer at a given time step of the
+            simulation in kWh during timestep time
+
+        timestep : float, default None
+            number of seconds between every time step of the simulation
+        """
+        if self.signal == 'self-consumption':
+            self.cpu.add_timestamp(timestamp)
+            return self.cpu.control(irr, load, timestep)
 
 if __name__ == "__main__":
 
@@ -208,9 +230,13 @@ if __name__ == "__main__":
                             parse_dates        = [1],
                             index_col          = 0,
                             )
-    load_data.index = pd.to_datetime(load_data.index) + pd.Timedelta(minutes=1)
-    irrad_data      = irr.iloc[:, 3]
+    # Convert 0..24:00 hours to 0..23:59
+    parse_hours(irr)
+    load_data.index = pd.to_datetime(load_data.index, dayfirst=True) + pd.Timedelta(minutes=1)
     load_demand     = load_data.iloc[:, 0]
+    irrad_data      = irr.iloc[:, 3]
+    irrad_data.index= pd.to_datetime(irrad_data.index) + pd.DateOffset(years=10)
+
     if any(',' in string for string in load_demand):
         load_demand = load_demand.str.replace(',', '.')
         load_demand = 30*pd.to_numeric(load_demand)
@@ -233,9 +259,17 @@ if __name__ == "__main__":
     #                 **META,
     #                 )
 
-    psimp.active(
-                irrad_data = irrad_data,
-                )
+    # psimp.active(
+    #             irrad_data = irrad_data,
+    #             )
+    timestep = timegrid(irrad_data)
+    for i, (irr, ld) in enumerate(zip(irrad_data, psimp.load_demand)):
+        psimp.run_pflow(
+                        irr = irr,
+                        load= ld,
+                        timestep=timestep,
+                        timestamp=psimp.load_demand[i],
+                        )
 
     # pphys.active(
     #             irrad_data = irrad_data,
