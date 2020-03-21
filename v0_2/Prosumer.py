@@ -60,10 +60,7 @@ class Prosumer(CPU):
     module_area : float, default 1.96 m2
         area of a single solar panel
 
-    oda_t : float, default None
-        outdoor air temperature data. Power output dependency on outdoor
-        temperature is not yet defined.
-        
+
     Return
     ----------
     
@@ -95,7 +92,7 @@ class Prosumer(CPU):
                  roof_area          = None,
                  pv_total_loss      = 0.0035,
                  module_area        = 1.96,
-                 oda_t              = None,
+                 # oda_t              = None,
                  ):
 
         # self.irrad_data       = irrad_data
@@ -121,7 +118,7 @@ class Prosumer(CPU):
         self.roof_area          = roof_area
         self.pv_total_loss      = pv_total_loss
         self.module_area        = module_area
-        self.oda_t              = oda_t
+        # self.oda_t              = oda_t
 
         self.cpu            = CPU(
                                   # p_pv            = self.p_pv,
@@ -145,7 +142,7 @@ class Prosumer(CPU):
                                   roof_area         = self.roof_area,
                                   pv_total_loss     = self.pv_total_loss,
                                   module_area       = self.module_area,
-                                  oda_t             = self.oda_t,
+                                  # oda_t             = self.oda_t,
                                   )
         if self.cpu.pvgen.pv_kw != self.pv_kw:
             self.pv_kw = self.cpu.pvgen.pv_kw
