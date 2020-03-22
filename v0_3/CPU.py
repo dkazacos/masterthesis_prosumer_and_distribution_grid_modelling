@@ -7,6 +7,7 @@ Created on Sat Feb 29 20:13:35 2020
 import sys
 sys.path.append('..')
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from utils.function_repo import timegrid, parse_hours
 from Storage import BatterySimple, Battery
@@ -211,7 +212,7 @@ class CPU(BatterySimple, PVgen):
             self.meta['battery_status'].append(1)
             self.meta['log'].append('surplus absorbed by battery. No grid flow')
 
-    def run_static_sim(self, irrad_data, load_data):
+    def run_static_sim(self, irrad_data, load_data, timestep):
         """
         Runs the data transfer at every timestamp of the simulation. This
         method calls CPU's control and runs throughout full length load
@@ -222,9 +223,11 @@ class CPU(BatterySimple, PVgen):
         irrad_data : pandas Series, default None
             time series of irradiation data that will be passed to the PV
             installation in Wh/m2
+
+        load_data : pandas Series, default None
+            timeseries of power requirements of Prosumer in kWh
         """
 
-        timestep = timegrid(irrad_data)
         i        = 0
         while self.signal =='self-consumption':
             irr_sun = irrad_data.iloc[i]
@@ -300,6 +303,7 @@ if __name__ == "__main__":
                 battery_capacity   = 3.5,
                 **META,
                 )
+    timestep = timegrid(irrad_data)
 
     # pphys = CPU(
     #             b_type = 'phys',
@@ -310,9 +314,9 @@ if __name__ == "__main__":
     # psimp.run_static_sim(
     #                   irrad_data = irrad_data,
     #                   load_data = load_demand,
+    #                   timestep = timestep,
     #                   )
 
-    timestep = timegrid(irrad_data)
     for i, (irr, ld) in enumerate(zip(irrad_data, load_demand)):
         psimp.run_pflow(
                         irrad_data  = irr,
