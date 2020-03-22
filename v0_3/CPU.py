@@ -211,7 +211,7 @@ class CPU(BatterySimple, PVgen):
             self.meta['battery_status'].append(1)
             self.meta['log'].append('surplus absorbed by battery. No grid flow')
 
-    def run_static_sim(self, irrad_data, load_data):
+    def run_static_sim(self, irrad_data, load_data, timestep):
         """
         Runs the data transfer at every timestamp of the simulation. This
         method calls CPU's control and runs throughout full length load
@@ -222,9 +222,11 @@ class CPU(BatterySimple, PVgen):
         irrad_data : pandas Series, default None
             time series of irradiation data that will be passed to the PV
             installation in Wh/m2
+
+        load_data : pandas Series, default None
+            timeseries of power requirements of Prosumer in kWh
         """
 
-        timestep = timegrid(irrad_data)
         i        = 0
         while self.signal =='self-consumption':
             irr_sun = irrad_data.iloc[i]
