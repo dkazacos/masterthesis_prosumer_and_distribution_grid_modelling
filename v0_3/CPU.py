@@ -7,6 +7,7 @@ Created on Sat Feb 29 20:13:35 2020
 import sys
 sys.path.append('..')
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from utils.function_repo import timegrid, parse_hours
 from Storage import BatterySimple, Battery
@@ -302,6 +303,7 @@ if __name__ == "__main__":
                 battery_capacity   = 3.5,
                 **META,
                 )
+    timestep = timegrid(irrad_data)
 
     # pphys = CPU(
     #             b_type = 'phys',
@@ -312,9 +314,9 @@ if __name__ == "__main__":
     # psimp.run_static_sim(
     #                   irrad_data = irrad_data,
     #                   load_data = load_demand,
+    #                   timestep = timestep,
     #                   )
 
-    timestep = timegrid(irrad_data)
     for i, (irr, ld) in enumerate(zip(irrad_data, load_demand)):
         psimp.run_pflow(
                         irrad_data  = irr,

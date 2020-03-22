@@ -53,6 +53,7 @@ psimp = CPU(
             battery_capacity   = 3.5,
             **META,
             )
+timestep = timegrid(irrad_data)
 
 # pphys = CPU(
 #             b_type = 'phys',
@@ -65,7 +66,6 @@ psimp = CPU(
 #                   load_data = load_demand,
 #                   )
 
-timestep = timegrid(irrad_data)
 for i, (irr, ld) in enumerate(zip(irrad_data, load_demand)):
     psimp.run_pflow(
                     irrad_data  = irr,
