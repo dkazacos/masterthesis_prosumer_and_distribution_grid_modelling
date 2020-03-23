@@ -20,8 +20,9 @@ class BatterySimple(object):
     battery_capacity : float, default 7.5
         capacity of the battery in kWh
 
-    signal : str, default None
-        place-holder for external control signals
+    initial_SOC : float, default 100
+        initial state of charge of battery at beginning of simulation
+        in percentage
 
     Returns
     ----------
@@ -34,9 +35,11 @@ class BatterySimple(object):
 
     def __init__(self,
                  battery_capacity   = 7.5,
+                 initial_SOC        = 100,
                  ):
 
         self.battery_capacity   = battery_capacity      # capacity of battery [kWh]
+        self.initial_SOC        = initial_SOC           # initial state of charge [%]
         self.meta               = {
                                    'P'              : [],   # dictionary of data
                                    'p_reject'       : [],   # rejected by battery
@@ -51,7 +54,7 @@ class BatterySimple(object):
         Returns the battery state of charge in %
         """
         if len(self.meta['battery_SOC']) == 0:
-            return 100
+            return self.initial_SOC
         else:
             return self.meta['battery_SOC'][-1]
 
@@ -105,7 +108,7 @@ class BatterySimple(object):
 
         if p > 0: # discharge battery
             if len(self.meta['battery_SOC']) == 0:
-                Q = self.get_battery_soc()/100 - p*h
+                Q = c*self.get_battery_soc()/100 - p*h
             else:
                 Q = c*self.meta['battery_SOC'][-1]/100 - p*h
             if Q < 0:
@@ -126,7 +129,7 @@ class BatterySimple(object):
 
         elif p < 0: # charge battery
             if len(self.meta['battery_SOC']) == 0:
-                Q = c - p*h
+                Q = c*self.get_battery_soc()/100 - p*h
             else:
                 Q = c*self.meta['battery_SOC'][-1]/100 - p*h
             if Q > c:
