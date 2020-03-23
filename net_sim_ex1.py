@@ -100,7 +100,6 @@ def neighborhood(net):
         pk = np.max(ld)
         # stantiate a Prosumer X
         META = {}
-        META['load_demand']         = ld
         META['pv_kw']               = pk*0.7
         META['battery_capacity']    = 3.5
         p = CPU(**META)
@@ -121,14 +120,14 @@ th_overload = pd.DataFrame()
 vm_pu_bus   = pd.DataFrame()
 slack_p     = pd.DataFrame()
 # Run stepwise simulation extracting load and irradiation
-for i, (ir, ld) in enumerate(zip(irr[960:1200], load[960:1200])):
-    print('new iteration', i)
-    
+for i, (ir, ld) in enumerate(zip(irr[1080:1140], load[1080:1140]*20)):
+    # print('new iteration', i)
+    print(ld)
     # Instantiate a controller unit for each Prosumer's load
     for j, (key, val) in enumerate(nh.items()):
         d = pd.DataFrame(index=[0])
-        val.run_pflow(ir, ld, timestep, timestamp=irr.index[i])
-        d[key] = -val.get_cpu_data()['p_grid_flow'][0]/1000
+        val.run_pflow(ir, ld, timestep, timestamp=irr[1080:1140].index[i])
+        d[key] = -val.meta['p_grid_flow'][-1]/100
         # sources[key] = p_grid
         ds = ts.DFData(d)
         # ds = ts.DFData(df)
@@ -138,7 +137,7 @@ for i, (ir, ld) in enumerate(zip(irr[960:1200], load[960:1200])):
                              profile_name=[key])
 
     # Run power flow calculation at every timestep iteration
-    mid = time.time()
+    # mid = time.time()
     ts.run_timeseries(net, verbose=False)
 
     # Store line overload, voltage at buses and slack power balance
@@ -146,7 +145,7 @@ for i, (ir, ld) in enumerate(zip(irr[960:1200], load[960:1200])):
     th_overload = th_overload.append(net.res_line.loading_percent.transpose())
     vm_pu_bus = vm_pu_bus.append(net.res_bus.vm_pu.transpose())
     slack_p = slack_p.append(net.res_ext_grid.p_mw)
-    print('Time since beginning of simulation: ', time.time() - now)
+    # print('Time since beginning of simulation: ', time.time() - now)
     
 # for pr, ind in zip(nh.keys(), net.bus.index[1:]):
 #     pp.create_load(net, bus=ind,
