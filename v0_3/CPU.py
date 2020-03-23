@@ -120,6 +120,7 @@ class CPU(BatterySimple, PVgen):
             self.battery = Battery(
                                     ncells      = self.ncells,
                                     cn          = self.cn,
+                                    initial_SOC = self.initial_SOC,
                                     vn          = self.vn,
                                     dco         = self.dco,
                                     cco         = self.cco,

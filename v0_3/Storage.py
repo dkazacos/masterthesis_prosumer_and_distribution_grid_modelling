@@ -167,7 +167,7 @@ class Battery(object):
     overload    = False
     p_kw        = None
 
-    def __init__(self, ncells=1000, cn=2.55, vn=3.7, dco=3.0, cco=4.2, max_c_rate=10):
+    def __init__(self, ncells=1000, cn=2.55, initial_SOC=100, vn=3.7, dco=3.0, cco=4.2, max_c_rate=10):
 
         """
         Default properties of battery cell: Li-ion CGR18650E Panasonic
@@ -175,21 +175,22 @@ class Battery(object):
         Hint: Initial state of charge = 100%
         """
 
-        # self.p_kw     = p_kw          # power exchange [kW]
-        self.ncells     = ncells        # number of cells in battery pack
-        self.cn         = cn            # nominal capacity of Li.ion cell [Ah]
-        self.vn         = vn            # nominal voltage of single [V]
-        self.dco        = dco           # discharge cut-off [V]
-        self.cco        = cco           # charge cut-off [V]
-        self.max_c_rate = max_c_rate    # determines max allowed current
-        self.meta       = {'P'          : [], # Store Power accepted by battery [kW]
-                           'p_reject' : [], # Store Power rejected by battery [kW]
-                           'Q'          : [], # Store charge of cell [Ah]
-                           'V1'         : [], # Store voltage of RC-1st of cell [V]
-                           'V2'         : [], # Store voltage of RC-2nd of cell [V]
-                           'Vcell'      : [], # Store cell voltage [V]
-                           'SOC'        : [], # Store cell SOC [%]
-                           }
+        # self.p_kw         = p_kw          # power exchange [kW]
+        self.ncells         = ncells        # number of cells in battery pack
+        self.cn             = cn            # nominal capacity of Li.ion cell [Ah]
+        self.initial_SOC    = initial_SOC   # initial state of charge [%]
+        self.vn             = vn            # nominal voltage of single [V]
+        self.dco            = dco           # discharge cut-off [V]
+        self.cco            = cco           # charge cut-off [V]
+        self.max_c_rate     = max_c_rate    # determines max allowed current
+        self.meta           = {'P'              : [], # Store Power accepted by battery [kW]
+                               'p_reject'       : [], # Store Power rejected by battery [kW]
+                               'Q'              : [], # Store charge of cell [Ah]
+                               'V1'             : [], # Store voltage of RC-1st of cell [V]
+                               'V2'             : [], # Store voltage of RC-2nd of cell [V]
+                               'Vcell'          : [], # Store cell voltage [V]
+                               'battery_SOC'    : [], # Store cell SOC [%]
+                               }
         # self.signal                = signal    # resembles signals from outside
 
     # =========================================================================
@@ -225,10 +226,10 @@ class Battery(object):
     # =========================================================================
 
     def get_battery_soc(self):
-        if len(self.meta['SOC']) == 0:
-            return 100 # TODO! Try include parameter for user on this topic
+        if len(self.meta['battery_SOC']) == 0:
+            return self.initial_SOC # TODO! Try include parameter for user on this topic
         else:
-            return self.meta['SOC'][-1]
+            return self.meta['battery_SOC'][-1]
 
     def get_battery_state(self):
         return self.state
@@ -353,15 +354,15 @@ class Battery(object):
         rs = 0.078          # Serial resistance [Ohm]: ohmic resistance of cell
         t  = np.linspace(1, timestep, timestep)
 
-        if len(self.meta['SOC']) == 0:
-            Qo     = self.cn * 3600      # initial condition for Q
+        if len(self.meta['battery_SOC']) == 0:
+            Qo     = self.cn*self.get_battery_soc()/100 * 3600      # initial condition for Q
             v_cell = self.cco
         else:
             Qo     = self.meta['Q'][-1]
         if self.state == 'Stand-by':
             v1o    = 0                   # initial condition for V1
             v2o    = 0                   # initial condition for V2
-            if len(self.meta['SOC']) > 0:
+            if len(self.meta['battery_SOC']) > 0:
                 v_cell = self.cco - (1.2 - Qo/(self.cn * 3600))
         else:
             v1o    = self.meta['V1'][-1] # initial condition for V1
@@ -408,4 +409,4 @@ class Battery(object):
         self.meta['V1'].append(v1t[-1])
         self.meta['V2'].append(v2t[-1])
         self.meta['Vcell'].append(v_cell[-1])
-        self.meta['SOC'].append(soct[-1]*100)
+        self.meta['battery_SOC'].append(soct[-1]*100)
