@@ -224,31 +224,31 @@ class Battery(object):
 
     # =========================================================================
 
-    def get_soc(self):
+    def get_battery_soc(self):
         if len(self.meta['SOC']) == 0:
             return 100 # TODO! Try include parameter for user on this topic
         else:
             return self.meta['SOC'][-1]
 
-    def get_state(self):
+    def get_battery_state(self):
         return self.state
 
-    def get_capacity(self):
+    def get_battery_capacity(self):
         return self.cn
 
-    def get_ccov(self):
+    def get_battery_ccov(self):
         return self.cco
 
-    def get_dcov(self):
+    def get_battery_dcov(self):
         return self.dco
 
-    def get_rated_energy_wh(self):
+    def get_battery_rated_energy_wh(self):
         return self.cn*self.vn*self.ncells
 
-    def get_data(self):
+    def get_battery_data(self):
         return pd.DataFrame(self.meta)
 
-    def get_ncells(self):
+    def get_battery_ncells(self):
         return self.ncells
 
     def bms(self, v_cell, p_w):
