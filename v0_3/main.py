@@ -49,8 +49,8 @@ META = {
         'pv_kw'         : 2.1,
         }
 psimp = CPU(
-            b_type              = 'phys',
-            # battery_capacity    = 3.5,
+            b_type              = 'linear',
+            battery_capacity    = 3.5,
             initial_SOC         = 75,
             **META,
             )
