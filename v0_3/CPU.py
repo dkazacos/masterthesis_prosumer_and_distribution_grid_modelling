@@ -39,6 +39,10 @@ class CPU(BatterySimple, PVgen):
     battery_capacity: float, default 7.5 kWh
         capacity of the battery in kWh
 
+    initial_SOC : float, default 100
+        initial state of charge of battery at beginning of simulation
+        in percentage
+
     pv_kw : float, default None
         installed peak power mounted on roof top in kW
 
@@ -73,6 +77,7 @@ class CPU(BatterySimple, PVgen):
                   switch_b          = None,
                   switch_pv         = None,
                   battery_capacity  = 7.5,
+                  initial_SOC       = 100,
                   ncells            = 1000,
                   cn                = 2.55,
                   vn                = 3.7,
@@ -92,6 +97,7 @@ class CPU(BatterySimple, PVgen):
         self.switch_b           = switch_b
         self.switch_pv          = switch_pv
         self.battery_capacity   = battery_capacity
+        self.initial_SOC        = initial_SOC
         self.ncells             = ncells
         self.cn                 = cn
         self.vn                 = vn
@@ -107,12 +113,14 @@ class CPU(BatterySimple, PVgen):
         self.module_area        = module_area
         if self.b_type == "linear":
             self.battery = BatterySimple(
-                                         battery_capacity = self.battery_capacity,
+                                         battery_capacity   = self.battery_capacity,
+                                         initial_SOC        = self.initial_SOC,
                                          )
         elif self.b_type == "phys":
             self.battery = Battery(
                                     ncells      = self.ncells,
                                     cn          = self.cn,
+                                    initial_SOC = self.initial_SOC,
                                     vn          = self.vn,
                                     dco         = self.dco,
                                     cco         = self.cco,
@@ -185,7 +193,7 @@ class CPU(BatterySimple, PVgen):
         self.meta['p_load'].append(p_load)
         self.meta['p_grid_flow'].append(self.battery.meta['p_reject'][-1])
         self.meta['p_battery_flow'].append(self.battery.meta['P'][-1])
-        self.meta['battery_SOC'].append(self.battery.meta['SOC'][-1])
+        self.meta['battery_SOC'].append(self.battery.meta['battery_SOC'][-1])
 
         if p_flow > 0 and self.battery.meta['p_reject'][-1] < 0: # battery rejects discharging
             self.meta['grid_status'].append(-1)
