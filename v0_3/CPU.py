@@ -185,7 +185,7 @@ class CPU(BatterySimple, PVgen):
         self.meta['p_load'].append(p_load)
         self.meta['p_grid_flow'].append(self.battery.meta['p_reject'][-1])
         self.meta['p_battery_flow'].append(self.battery.meta['P'][-1])
-        self.meta['battery_SOC'].append(self.battery.meta['SOC'][-1])
+        self.meta['battery_SOC'].append(self.battery.meta['battery_SOC'][-1])
 
         if p_flow > 0 and self.battery.meta['p_reject'][-1] < 0: # battery rejects discharging
             self.meta['grid_status'].append(-1)

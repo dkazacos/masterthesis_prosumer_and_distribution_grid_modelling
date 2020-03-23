@@ -38,10 +38,10 @@ class BatterySimple(object):
 
         self.battery_capacity   = battery_capacity      # capacity of battery [kWh]
         self.meta               = {
-                                   'P'          : [],   # dictionary of data
-                                   'p_reject'   : [],   # rejected by battery
-                                   'SOC'        : [],   # state of charge
-                                   'log'        : [],   # occurrences
+                                   'P'              : [],   # dictionary of data
+                                   'p_reject'       : [],   # rejected by battery
+                                   'battery_SOC'    : [],   # state of charge
+                                   'log'            : [],   # occurrences
                                    }
         if self.battery_capacity < 0:
             raise AttributeError('Battery capacity cannot be a negative number')
@@ -50,10 +50,10 @@ class BatterySimple(object):
         """
         Returns the battery state of charge in %
         """
-        if len(self.meta['SOC']) == 0:
+        if len(self.meta['battery_SOC']) == 0:
             return 100
         else:
-            return self.meta['SOC'][-1]
+            return self.meta['battery_SOC'][-1]
 
     def get_battery_state(self):
         """
@@ -104,56 +104,56 @@ class BatterySimple(object):
         c           = self.battery_capacity
 
         if p > 0: # discharge battery
-            if len(self.meta['SOC']) == 0:
-                Q = c - p*h
+            if len(self.meta['battery_SOC']) == 0:
+                Q = self.get_battery_soc()/100 - p*h
             else:
-                Q = c*self.meta['SOC'][-1]/100 - p*h
+                Q = c*self.meta['battery_SOC'][-1]/100 - p*h
             if Q < 0:
                 self.state = 'Depleted'
                 self.meta['p_reject'].append(Q/h)   # rejected negative power (negative for grid)
-                if len(self.meta['SOC']) == 0:
+                if len(self.meta['battery_SOC']) == 0:
                     self.meta['P'].append(c/h)      # accepted positive power (discharge)
                 else:
-                    self.meta['P'].append((c*self.meta['SOC'][-1]/100)/h)
-                self.meta['SOC'].append(0)
+                    self.meta['P'].append((c*self.meta['battery_SOC'][-1]/100)/h)
+                self.meta['battery_SOC'].append(0)
                 self.meta['log'].append('discharged, depleted')
             elif Q >= 0:
                 self.state = 'Operational'
                 self.meta['p_reject'].append(0)
                 self.meta['P'].append(p)
-                self.meta['SOC'].append(Q/c*100)
+                self.meta['battery_SOC'].append(Q/c*100)
                 self.meta['log'].append('discharging')
 
         elif p < 0: # charge battery
-            if len(self.meta['SOC']) == 0:
+            if len(self.meta['battery_SOC']) == 0:
                 Q = c - p*h
             else:
-                Q = c*self.meta['SOC'][-1]/100 - p*h
+                Q = c*self.meta['battery_SOC'][-1]/100 - p*h
             if Q > c:
                 self.state = 'Fully charged'
                 self.meta['p_reject'].append((Q-c)/h)                       # rejected positive power (positive for grid)
-                self.meta['P'].append(-c*(1-self.meta['SOC'][-1]/100)/h)    # accepted negative power (charge)
-                self.meta['SOC'].append(100)
+                self.meta['P'].append(-c*(1-self.meta['battery_SOC'][-1]/100)/h)    # accepted negative power (charge)
+                self.meta['battery_SOC'].append(100)
                 self.meta['log'].append('charged, fully charged')
             elif Q <= c:
                 self.state = 'Operational'
                 self.meta['p_reject'].append(0)
                 self.meta['P'].append(p)
-                self.meta['SOC'].append(Q/c*100)
+                self.meta['battery_SOC'].append(Q/c*100)
                 self.meta['log'].append('charging')
 
         elif p == 0: # no flow in/out battery
             if st == 'Fully charged':
-                self.meta['SOC'].append(100)
+                self.meta['battery_SOC'].append(100)
                 self.meta['p_reject'].append(-p_kw)                         # rejected at charging (positive for grid)
             elif st == 'Depleted':
-                self.meta['SOC'].append(0)
+                self.meta['battery_SOC'].append(0)
                 self.meta['p_reject'].append(-p_kw)                         # rejected at discharging (negative for grid)
             elif st == 'Operational':
-                if len(self.meta['SOC']) == 0:
-                    self.meta['SOC'].append(100)
+                if len(self.meta['battery_SOC']) == 0:
+                    self.meta['battery_SOC'].append(100)
                 else:
-                    self.meta['SOC'].append(self.meta['SOC'][-1])
+                    self.meta['battery_SOC'].append(self.meta['battery_SOC'][-1])
             self.meta['P'].append(p)
             self.meta['log'].append('No power flow through battery')
 
