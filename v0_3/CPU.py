@@ -147,6 +147,23 @@ class CPU(BatterySimple, PVgen):
         """
         return pd.DataFrame(self.meta)
 
+    def set_battery_capacity(self, c):
+        """
+        init parent Battery battery capacity with desired value c in kWh
+        """
+        self.battery_capacity = c
+        self.battery.battery_capacity = self.battery_capacity
+
+    def set_pv_installed_power(self, pv_kw):
+        """
+        init parent PVgen installed pv power with desired value pv_kw in kW
+        Careful: pv installed power obeys the limitations of the panel
+        characteristics. Make sure to set a power that is multiple of
+        PVgen panel_peak_p attribute
+        """
+        self.pv_kw = pv_kw
+        self.pvgen.pv_kw = self.pv_kw
+
     def add_timestamp(self, timestamp):
         """
         Extracts the datetime string at every time step of the simulation and
