@@ -76,6 +76,12 @@ class BatterySimple(object):
         """
         return self.battery_capacity
 
+    def set_battery_capacity(self, c):
+        """
+        init battery capacity with desired value c in kWh
+        """
+        self.battery_capacity = c
+
     def bms(self):
         """
         Battery Management System (BMS). Dictates the acceptance of

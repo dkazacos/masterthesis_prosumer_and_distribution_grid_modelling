@@ -108,6 +108,15 @@ class PVgen(object):
         """
         return self.pv_kw
 
+    def set_installed_pv_power(self, pv_kw):
+        """
+        init installed pv power with desired value pv_kw in kW
+        Careful: pv installed power obeys the limitations of the panel
+        characteristics. Make sure to set a power that is multiple of
+        panel_peak_p attribute
+        """
+        self.pv_kw = pv_kw
+
     def get_pv_sys_loss(self):
         """
         Returns the PV total power loss in per unit
