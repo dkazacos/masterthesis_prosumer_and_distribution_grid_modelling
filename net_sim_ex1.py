@@ -100,7 +100,7 @@ def neighborhood(net):
         pk = np.max(ld)
         # stantiate a Prosumer X
         META = {}
-        META['initial_SOC']         = 25
+        META['initial_SOC']         = 60
         META['pv_kw']               = pk*0.7
         META['battery_capacity']    = 3.5
         p = CPU(**META)
@@ -127,10 +127,10 @@ def create_output_writer(net, time_steps, output_dir):
                          output_file_type=".xls", log_variables=list())
     # these variables are saved to the harddisk after / during the time series loop
     ow.log_variable('res_ext_grid', 'p_mw')
-    ow.log_variable('res_load', 'p_mw')
+    # ow.log_variable('res_load', 'p_mw')
     ow.log_variable('res_bus', 'vm_pu')
     ow.log_variable('res_line', 'loading_percent')
-    ow.log_variable('res_line', 'i_ka')
+    # ow.log_variable('res_line', 'i_ka')
     return ow
 t           = []
 th_overload = pd.DataFrame()
@@ -148,7 +148,7 @@ for i, (ir, ld) in enumerate(zip(irr[1080:1140], load[1080:1140]*15)):
         ld = ld*(1-ft)
         # print(ld)
         val.run_pflow(ir, ld, timestep, timestamp=irr[1080:1140].index[i])
-        d[key] = -val.meta['p_grid_flow'][-1]/100
+        d[key] = -val.meta['p_grid_flow'][-1]/1000
         # sources[key] = p_grid
         ds = ts.DFData(d)
         print(d)
