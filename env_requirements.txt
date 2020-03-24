@@ -4,3 +4,6 @@
 # pandapower == 2.2.0
 # pandas == 0.25.3
 # numpy == 1.18.1
+
+# Update 23/03/20
+# pip install xlwt

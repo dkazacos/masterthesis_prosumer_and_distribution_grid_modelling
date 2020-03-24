@@ -45,7 +45,7 @@ def simple_net():
     pp.create_line(net, from_bus=11, to_bus=12, length_km=0.12, std_type='15-AL1/3-ST1A 0.4')
     # Create external grid
     pp.create_ext_grid(net, bus=0, m_pu=1.03, va_degree=0, name='External grid',
-                       s_sc_max_mva=10000, rx_max=0.1, rx_min=0.1)
+                       s_sc_max_mva=10, rx_max=0.1, rx_min=0.1)
     # Create transformer
     pp.create_transformer_from_parameters(net, hv_bus=0, lv_bus=1, sn_mva=.4,
                                           vn_hv_kv=10, vn_lv_kv=0.4, vkr_percent=1.325,
@@ -55,7 +55,7 @@ def simple_net():
                                           shift_degree=150, name='MV-LV-Trafo')
     for ind in range(1,13):
         pp.create_load(net, bus=ind,
-                        p_mw=0.0025,
+                        p_mw=0.0035,
                         name='Prosumer %s' % ind)
     return net
 
@@ -93,13 +93,14 @@ def neighborhood(net):
     neighborhood = {}
     for b in net.bus.index[1:]:
 
-        # Generate a variation of a prosumer load of +/- 30 %
+        # Randomly generate a variation of a prosumer pv peak within +/- 30 %
         ft = random.randint(1,30)/100
         ld = load_demand*(1-ft)
         # Install a PV power around the magnitude of the peak demand of Prosumer X
         pk = np.max(ld)
         # stantiate a Prosumer X
         META = {}
+        META['initial_SOC']         = 25
         META['pv_kw']               = pk*0.7
         META['battery_capacity']    = 3.5
         p = CPU(**META)
@@ -108,28 +109,49 @@ def neighborhood(net):
 
     return neighborhood
 
-# Create loads
+# ============================================================================
+# RUN example
+# Load data
 irr, load = import_data()
+# Extract timestep size
 timestep = timegrid(load)
-
+# create network
 net = simple_net()
+# create neighborhood
 nh = neighborhood(net)
+
 now=time.time()
+# Initialize results storage
+def create_output_writer(net, time_steps, output_dir):
+    ow = ts.OutputWriter(net, time_steps, output_path=output_dir,
+                         output_file_type=".xls", log_variables=list())
+    # these variables are saved to the harddisk after / during the time series loop
+    ow.log_variable('res_ext_grid', 'p_mw')
+    ow.log_variable('res_load', 'p_mw')
+    ow.log_variable('res_bus', 'vm_pu')
+    ow.log_variable('res_line', 'loading_percent')
+    ow.log_variable('res_line', 'i_ka')
+    return ow
 t           = []
 th_overload = pd.DataFrame()
 vm_pu_bus   = pd.DataFrame()
 slack_p     = pd.DataFrame()
 # Run stepwise simulation extracting load and irradiation
-for i, (ir, ld) in enumerate(zip(irr[1080:1140], load[1080:1140]*20)):
+for i, (ir, ld) in enumerate(zip(irr[1080:1140], load[1080:1140]*15)):
     # print('new iteration', i)
     print(ld)
     # Instantiate a controller unit for each Prosumer's load
     for j, (key, val) in enumerate(nh.items()):
         d = pd.DataFrame(index=[0])
+        # Randomly generate a variation of a prosumer load within +/- 30 %
+        ft = random.randint(1,30)/1000
+        ld = ld*(1-ft)
+        # print(ld)
         val.run_pflow(ir, ld, timestep, timestamp=irr[1080:1140].index[i])
         d[key] = -val.meta['p_grid_flow'][-1]/100
         # sources[key] = p_grid
         ds = ts.DFData(d)
+        print(d)
         # ds = ts.DFData(df)
         control.ConstControl(net, element='load',
                              element_index=[j],
@@ -138,6 +160,7 @@ for i, (ir, ld) in enumerate(zip(irr[1080:1140], load[1080:1140]*20)):
 
     # Run power flow calculation at every timestep iteration
     # mid = time.time()
+    ow = create_output_writer(net,[], "E:/Temp")
     ts.run_timeseries(net, verbose=False)
 
     # Store line overload, voltage at buses and slack power balance
@@ -146,13 +169,3 @@ for i, (ir, ld) in enumerate(zip(irr[1080:1140], load[1080:1140]*20)):
     vm_pu_bus = vm_pu_bus.append(net.res_bus.vm_pu.transpose())
     slack_p = slack_p.append(net.res_ext_grid.p_mw)
     # print('Time since beginning of simulation: ', time.time() - now)
-    
-# for pr, ind in zip(nh.keys(), net.bus.index[1:]):
-#     pp.create_load(net, bus=ind,
-#                    p_mw=nh[pr].pv_kw/1000,
-#                    name=pr[:9+len(str(ind))])
-
-# ============================================================================
-# Run Net POWERFLOW
-# pp.runpp(net)
-# print(net.res_line)
