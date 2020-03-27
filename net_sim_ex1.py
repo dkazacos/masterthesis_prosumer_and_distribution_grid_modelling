@@ -156,8 +156,8 @@ for i, (ir, ld) in enumerate(zip(irr[1080:1140], load[1080:1140]*10)):
 
     # Store line overload, voltage at buses and slack power balance
     res['Time'].append(irr.index[i])
-    res['th_overload'].append(net.res_line.loading_percent.transpose())
-    res['vm_pu_bus'].append(net.res_bus.vm_pu.transpose())
-    res['slack_p'].append(net.res_ext_grid.p_mw)
+    res['th_overload'].append(net.res_line.loading_percent.tolist())
+    res['vm_pu_bus'].append(net.res_bus.vm_pu.tolist())
+    res['slack_p'].append(net.res_ext_grid.p_mw.tolist())
     # print('Time since beginning of simulation: ', time.time() - now)
 results = pd.DataFrame(res)
