@@ -24,6 +24,9 @@ class BatterySimple(object):
         initial state of charge of battery at beginning of simulation
         in percentage
 
+    min_max_SOC : tuple, default None
+        buffer interval for grid feed-in and supply simultaneity control in %
+
     Returns
     ----------
 
@@ -36,10 +39,12 @@ class BatterySimple(object):
     def __init__(self,
                  battery_capacity   = 7.5,
                  initial_SOC        = 100,
+                 # min_max_SOC        = None,
                  ):
 
         self.battery_capacity   = battery_capacity      # capacity of battery [kWh]
         self.initial_SOC        = initial_SOC           # initial state of charge [%]
+        # self.min_max_SOC        = min_max_SOC           # buffer SOC interval
         self.meta               = {
                                    'P'              : [],   # dictionary of data
                                    'p_reject'       : [],   # rejected by battery
@@ -113,17 +118,17 @@ class BatterySimple(object):
         c           = self.battery_capacity
 
         if p > 0: # discharge battery
-            if len(self.meta['battery_SOC']) == 0:
+            if not self.meta['battery_SOC']:
                 Q = c*self.get_battery_soc()/100 - p*h
             else:
-                Q = c*self.meta['battery_SOC'][-1]/100 - p*h
+                Q = c*self.get_battery_soc()/100 - p*h
             if Q < 0:
                 self.state = 'Depleted'
                 self.meta['p_reject'].append(Q/h)   # rejected negative power (negative for grid)
-                if len(self.meta['battery_SOC']) == 0:
+                if not self.meta['battery_SOC']:
                     self.meta['P'].append(c/h)      # accepted positive power (discharge)
                 else:
-                    self.meta['P'].append((c*self.meta['battery_SOC'][-1]/100)/h)
+                    self.meta['P'].append((c*self.get_battery_soc()/100)/h)
                 self.meta['battery_SOC'].append(0)
                 self.meta['log'].append('discharged, depleted')
             elif Q >= 0:
@@ -134,14 +139,14 @@ class BatterySimple(object):
                 self.meta['log'].append('discharging')
 
         elif p < 0: # charge battery
-            if len(self.meta['battery_SOC']) == 0:
+            if not self.meta['battery_SOC']:
                 Q = c*self.get_battery_soc()/100 - p*h
             else:
-                Q = c*self.meta['battery_SOC'][-1]/100 - p*h
+                Q = c*self.get_battery_soc()/100 - p*h
             if Q > c:
                 self.state = 'Fully charged'
                 self.meta['p_reject'].append((Q-c)/h)                       # rejected positive power (positive for grid)
-                self.meta['P'].append(-c*(1-self.meta['battery_SOC'][-1]/100)/h)    # accepted negative power (charge)
+                self.meta['P'].append(-c*(1-self.get_battery_soc()/100)/h)    # accepted negative power (charge)
                 self.meta['battery_SOC'].append(100)
                 self.meta['log'].append('charged, fully charged')
             elif Q <= c:
@@ -159,10 +164,10 @@ class BatterySimple(object):
                 self.meta['battery_SOC'].append(0)
                 self.meta['p_reject'].append(-p_kw)                         # rejected at discharging (negative for grid)
             elif st == 'Operational':
-                if len(self.meta['battery_SOC']) == 0:
+                if not self.meta['battery_SOC']:
                     self.meta['battery_SOC'].append(100)
                 else:
-                    self.meta['battery_SOC'].append(self.meta['battery_SOC'][-1])
+                    self.meta['battery_SOC'].append(self.get_battery_soc())
             self.meta['P'].append(p)
             self.meta['log'].append('No power flow through battery')
 
