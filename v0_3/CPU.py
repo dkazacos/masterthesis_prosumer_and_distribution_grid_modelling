@@ -69,7 +69,7 @@ class CPU(BatterySimple, PVgen):
 
     """
 
-    signal   = 'self-consumption'   # also: 'grid high voltage', 'reactive feed-in'
+    signal   = 'self-consumption'   # also: 'buffer-grid', 'reactive feed-in'
     strategy = 'pv-priority'        # also: 'grid-friendly', 'cooperative'
 
     def __init__(self,
