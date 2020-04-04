@@ -17,7 +17,7 @@ class PVgen(object):
 
     Parameters
     ----------
-    pv_kw : float, default None
+    installed_pv : float, default None
         installed peak power mounted on roof top in kW
 
     num_panels : int default None
@@ -41,7 +41,7 @@ class PVgen(object):
     ----------
     Accepts combination of arguments to fully characterize a PV installation
 
-        .. PV peak power installed (pv_kw) fully characterizes installation
+        .. PV peak power installed (installed_pv) fully characterizes installation
 
         .. number of panels (num_panels) fully characterizes installation
 
@@ -55,7 +55,7 @@ class PVgen(object):
     """
 
     def __init__(self,
-                 pv_kw          = None,
+                 installed_pv   = None,
                  num_panels     = None,
                  panel_peak_p   = 0.3,
                  pv_eff         = 0.18,
@@ -64,7 +64,7 @@ class PVgen(object):
                  module_area    = 1.96,
                  ):
 
-        self.pv_kw          = pv_kw
+        self.installed_pv   = installed_pv
         self.num_panels     = num_panels
         self.panel_peak_p   = panel_peak_p
         self.pv_eff         = pv_eff
@@ -72,50 +72,63 @@ class PVgen(object):
         self.pv_total_loss  = pv_total_loss
         self.module_area    = module_area
         self.meta           = {
-                               'irr_sol'  : [],
+                               'irr_sol'    : [],
+                               'p_prod'     : [],
                                }
-        if not self.pv_kw:
+        if not self.installed_pv:
             if self.num_panels:
-                self.pv_kw = self.num_panels * self.panel_peak_p
+                self.installed_pv = self.num_panels * self.panel_peak_p
                 if self.roof_area:
                     if self.num_panels * self.module_area > math.floor(self.roof_area / self.module_area):
-                        raise AttributeError('Invalid number of PVgen panels: %s. Won´t fit in roof area: %s m2 for a module area of %s m2' % (self.num_panels, self.roof_area, self.module_area))
+                        raise AttributeError('Invalid number of PVgen panels: %s. ' +
+                                             'Won´t fit in roof area: %s m2 for a ' +
+                                             'module area of %s m2' % (self.num_panels,
+                                                                       self.roof_area,
+                                                                       self.module_area)
+                                             )
             elif self.roof_area and not self.num_panels:
                 self.num_panels = math.floor(self.roof_area / self.module_area)
-                self.pv_kw = self.num_panels * self.panel_peak_p
+                self.installed_pv = self.num_panels * self.panel_peak_p
             else:
-                warnings.warn('Missing args: see PVgen class documentation. Need pv_kw, num_panels or roof_area')
-        elif self.pv_kw and not self.num_panels:
-            if self.pv_kw < 0:
+                warnings.warn('Missing args: see PVgen class documentation. ' +
+                              'Need installed_pv, num_panels or roof_area')
+        elif self.installed_pv and not self.num_panels:
+            if self.installed_pv < 0:
                 raise AttributeError('PV installed power cannot be a negative number')
             if self.roof_area:
-                if self.pv_kw / self.panel_peak_p * self.module_area > self.roof_area:
-                    raise AttributeError('Invalid PVgen installed power. Not enough roof area for given module characteritics to yield %s kW. Reduce PV installed power or increase roof area' % self.pv_kw)
-            if decimal.Decimal('%s' % self.pv_kw) % decimal.Decimal('%s' % self.panel_peak_p) != 0:
-                self.num_panels = math.ceil(self.pv_kw / self.panel_peak_p)
+                if self.installed_pv / self.panel_peak_p * self.module_area > self.roof_area:
+                    raise AttributeError('Invalid PVgen installed power. ' +
+                                         'Not enough roof area for given ' +
+                                         'module characteritics to yield %s ' +
+                                         'kW. Reduce PV installed power or ' +
+                                         'increase roof area' % self.installed_pv)
+            if decimal.Decimal('%s' % self.installed_pv) % decimal.Decimal('%s' % self.panel_peak_p) != 0:
+                self.num_panels = math.ceil(self.installed_pv / self.panel_peak_p)
                 self._readjust_pv_kw()
             else:
-                self.num_panels = self.pv_kw / self.panel_peak_p
+                self.num_panels = self.installed_pv / self.panel_peak_p
 
     def _readjust_pv_kw(self, verbose=False):
         if verbose:
-            warnings.warn('Module characteristics require chosen PVgen installed power to be adjusted to %s kW. See class default args' % self.pv_kw)
-        self.pv_kw = self.num_panels * self.panel_peak_p
+            warnings.warn('Module characteristics require chosen PVgen ' +
+                          'installed power to be adjusted to ' +
+                          '%s kW. See class default args' % self.installed_pv)
+        self.installed_pv = self.num_panels * self.panel_peak_p
 
     def get_installed_pv(self):
         """
         Returns the PV installed power in kW
         """
-        return self.pv_kw
+        return self.installed_pv
 
-    def set_installed_pv_power(self, pv_kw):
+    def set_installed_pv_power(self, installed_pv):
         """
-        init installed pv power with desired value pv_kw in kW
+        init installed pv power with desired value installed pv in kW
         Careful: pv installed power obeys the limitations of the panel
         characteristics. Make sure to set a power that is multiple of
         panel_peak_p attribute
         """
-        self.pv_kw = pv_kw
+        self.installed_pv = installed_pv
 
     def get_pv_sys_loss(self):
         """
@@ -149,6 +162,10 @@ class PVgen(object):
         p_sun_wh = irr_sol * self.module_area * self.num_panels
         p_sun_kw = p_sun_wh / timestep * 3.6
         if p_sun_kw > self.get_installed_pv():
-            return self.get_installed_pv() * (1. - self.pv_total_loss)
+            p_prod = self.get_installed_pv() * (1. - self.pv_total_loss)
         else:
-            return p_sun_kw * (1. - self.pv_total_loss)
+            p_prod = p_sun_kw * (1. - self.pv_total_loss)
+
+        self.meta['irr_sol'].append(irr_sol)
+        self.meta['p_prod'].append(p_prod)
+        return p_prod
