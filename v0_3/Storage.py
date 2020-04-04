@@ -8,6 +8,7 @@ Created on Fri Feb 21 23:20:35 2020
 import pandas as pd
 import numpy as np
 from scipy.integrate import odeint
+import warnings
 
 class BatterySimple(object):
     """
@@ -199,34 +200,35 @@ class Battery(object):
 
     state       = 'Stand-by'
     signal      = 'self-consumption'
-    overload    = False
-    p_kw        = None
+    overload    = False # boolean
+    p_kw        = None  # float
 
-    def __init__(self, ncells=1000, cn=2.55, initial_SOC=100, min_max_SOC=(0,100), vn=3.7, dco=3.0, cco=4.2, max_c_rate=10):
+    def __init__(self, battery_capacity=7.5, initial_SOC=100, min_max_SOC=(0,100),
+                 cn=2.55, vn=3.7, dco=3.0, cco=4.2, max_c_rate=10):
 
         """
         Default properties of battery cell: Li-ion CGR18650E Panasonic
 
-        Hint: Initial state of charge = 100%
         """
 
-        self.ncells         = ncells        # number of cells in battery pack
-        self.cn             = cn            # nominal capacity of Li.ion cell [Ah]
-        self.initial_SOC    = initial_SOC   # initial state of charge [%]
-        self.min_max_SOC    = min_max_SOC   # interval for buffer-grid strategy [%]
-        self.vn             = vn            # nominal voltage of single [V]
-        self.dco            = dco           # discharge cut-off [V]
-        self.cco            = cco           # charge cut-off [V]
-        self.max_c_rate     = max_c_rate    # determines max allowed current
-        self.meta           = {'P'              : [], # Store Power accepted by battery [kW]
-                               'p_reject'       : [], # Store Power rejected by battery [kW]
-                               'Q'              : [], # Store charge of cell [Ah]
-                               'V1'             : [], # Store voltage of RC-1st of cell [V]
-                               'V2'             : [], # Store voltage of RC-2nd of cell [V]
-                               'Vcell'          : [], # Store cell voltage [V]
-                               'battery_SOC'    : [], # Store cell SOC [%]
-                               }
-        # self.signal                = signal    # resembles signals from outside
+        self.battery_capacity   = battery_capacity  # Capacity of battery [kWh]
+        self.initial_SOC        = initial_SOC       # initial state of charge [%]
+        self.min_max_SOC        = min_max_SOC       # interval for buffer-grid strategy [%]
+        self.cn                 = cn                # nominal capacity of Li.ion cell [Ah]
+        self.vn                 = vn                # nominal voltage of single [V]
+        self.dco                = dco               # discharge cut-off [V]
+        self.cco                = cco               # charge cut-off [V]
+        self.max_c_rate         = max_c_rate        # determines max allowed current
+        self.meta               = {'P'              : [], # Store Power accepted by battery [kW]
+                                   'p_reject'       : [], # Store Power rejected by battery [kW]
+                                   'Q'              : [], # Store charge of cell [Ah]
+                                   'V1'             : [], # Store voltage of RC-1st of cell [V]
+                                   'V2'             : [], # Store voltage of RC-2nd of cell [V]
+                                   'Vcell'          : [], # Store cell voltage [V]
+                                   'battery_SOC'    : [], # Store cell SOC [%]
+                                   }
+        
+        self.ncells = self.battery_capacity/(self.cn*self.vn)*1000 # number of cells in battery pack
 
     # =========================================================================
 
@@ -280,23 +282,37 @@ class Battery(object):
                 self.state = 'Operational'
                 return self.state
 
-    def get_battery_capacity(self):
+    def get_battery_current_signal(self):
+        return self.signal
+
+    def get_battery_cell_capacity(self):
         return self.cn
 
-    def get_battery_ccov(self):
+    def get_battery_cell_cut_off_charge(self):
         return self.cco
 
-    def get_battery_dcov(self):
+    def get_battery_cell_cut_off_discharge(self):
         return self.dco
 
-    def get_battery_rated_energy_wh(self):
-        return self.cn*self.vn*self.ncells
+    def get_battery_capacity(self):
+        return self.battery_capacity
+
+    def set_battery_capacity(self, c):
+        """
+        init battery capacity with desired value c in kWh
+        """
+        self.battery_capacity = c
 
     def get_battery_data(self):
         return pd.DataFrame(self.meta)
 
-    def get_battery_ncells(self):
-        return self.ncells
+    def get_battery_number_of_li_ion_cells(self):
+        if not isinstance(self.ncells, int):
+            warnings.warn('Number of cells is an approximation. Chosen battery ' +
+                          'capacity is inconsistent with number of cells since ' +
+                          'number of cells needs to be an integer. True number ' +
+                          'of cells is %s' % self.ncells)
+        return np.ceil(self.ncells)
 
     def bms(self, v_cell, p_w, Q):
         """
