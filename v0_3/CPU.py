@@ -78,7 +78,7 @@ class CPU(BatterySimple, PVgen):
                   switch_pv         = None,
                   battery_capacity  = 7.5,
                   initial_SOC       = 100,
-                  ncells            = 1000,
+                  min_max_SOC       = (0, 100),
                   cn                = 2.55,
                   vn                = 3.7,
                   dco               = 3.0,
@@ -98,7 +98,7 @@ class CPU(BatterySimple, PVgen):
         self.switch_pv          = switch_pv
         self.battery_capacity   = battery_capacity
         self.initial_SOC        = initial_SOC
-        self.ncells             = ncells
+        self.min_max_SOC        = min_max_SOC
         self.cn                 = cn
         self.vn                 = vn
         self.dco                = dco
@@ -115,16 +115,18 @@ class CPU(BatterySimple, PVgen):
             self.battery = BatterySimple(
                                          battery_capacity   = self.battery_capacity,
                                          initial_SOC        = self.initial_SOC,
+                                         min_max_SOC        = self.min_max_SOC,
                                          )
         elif self.b_type == "phys":
             self.battery = Battery(
-                                    ncells      = self.ncells,
-                                    cn          = self.cn,
-                                    initial_SOC = self.initial_SOC,
-                                    vn          = self.vn,
-                                    dco         = self.dco,
-                                    cco         = self.cco,
-                                    max_c_rate  = self.max_c_rate,
+                                    battery_capacity    = self.battery_capacity,
+                                    initial_SOC         = self.initial_SOC,
+                                    min_max_SOC         = self.min_max_SOC,
+                                    cn                  = self.cn,
+                                    vn                  = self.vn,
+                                    dco                 = self.dco,
+                                    cco                 = self.cco,
+                                    max_c_rate          = self.max_c_rate,
                                     )
         self.pvgen  = PVgen(
                             pv_kw           = self.pv_kw,
