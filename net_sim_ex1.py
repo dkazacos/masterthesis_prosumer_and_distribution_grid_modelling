@@ -100,10 +100,12 @@ def neighborhood(net):
         # Install a PV power around the magnitude of the peak demand of Prosumer X
         pk = np.max(ld)
         # stantiate a Prosumer X
-        META = {}
-        META['initial_SOC']         = 60
-        META['pv_kw']               = pk*0.7
-        META['battery_capacity']    = 3.5
+        META = {
+                'initial_SOC'       : 60,
+                'installed_pv'      : pk*0.7,
+                'min_max_SOC'       : (20, 80), 
+                'battery_capacity'  : 3.5
+                }
         p = CPU(**META)
         # Store Prosumer X in Neighborhood dictionary
         neighborhood['Prosumer %s in %s' % (b, net.bus.name[b])] = p
