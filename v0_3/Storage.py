@@ -275,7 +275,7 @@ class Battery(object):
         elif self.get_battery_soc() == 0:
             self.state = 'Depleted'
             return self.state
-        elif (self.get_battery_soc()>0) and (self.get_battery_soc()<100):
+        elif (self.get_battery_soc() > 0) and (self.get_battery_soc() < 100):
             if self.state == 'Stand-by':
                 return self.state
             else:
@@ -324,15 +324,13 @@ class Battery(object):
 
         Returns cell active power In/Out
         """
-        num_cells = self.ncells
-        st = self.state
-        soc = Q/(self.cn * 36)
+        num_cells   = self.ncells
+        st          = self.get_battery_state()
+        soc         = Q/(self.cn * 36)
         if p_w/num_cells < 0:           # charge battery p < 0
             if st == 'Fully charged':
-                self.state = 'Fully charged'
-                #Q = Q
                 p_acc = 0
-                p_rej = -p_w/num_cells
+                p_rej = -p_w
             elif st in ['Operational', 'Depleted', 'Stand-by']:
                 self.state = 'Operational'
                 if self.signal == 'buffer-grid':
@@ -343,24 +341,22 @@ class Battery(object):
                     elif soc >= 100:
                         self.state = 'Fully charged'
                         p_acc = 0
-                        p_rej = -p_w/num_cells
+                        p_rej = -p_w
                     else:
                         p_acc = p_w/num_cells
                         p_rej = 0   
                 elif self.signal == 'self-consumption':
                     if soc < 100:
-                        self.state = 'Operational'
                         p_acc = p_w/num_cells
                         p_rej = 0
                     elif soc >= 100:
                         self.state = 'Fully charged'
                         p_acc = 0
-                        p_rej = -p_w/num_cells
+                        p_rej = -p_w
         elif p_w/num_cells > 0:         # discharge battery p > 0
             if st == 'Depleted':
-                self.state = 'Depleted'
                 p_acc = 0
-                p_rej = -p_w/num_cells
+                p_rej = -p_w
             elif st in ['Operational', 'Fully charged', 'Stand-by']:
                 self.state = 'Operational'
                 if self.signal == 'buffer-grid':
@@ -371,19 +367,18 @@ class Battery(object):
                     elif soc <= 0:
                         self.state = 'Depleted'
                         p_acc = 0
-                        p_rej = -p_w/num_cells
+                        p_rej = -p_w
                     else:
                         p_acc = p_w/num_cells
                         p_rej = 0
                 elif self.signal == 'self-consumption':
                     if soc > 0:
-                        self.state = 'Operational'
                         p_acc = p_w/num_cells
                         p_rej = 0
                     elif soc <= 0:
                         self.state = 'Depleted'
                         p_acc = 0
-                        p_rej = -p_w/num_cells
+                        p_rej = -p_w
         elif p_w/num_cells == 0:
             self.state = 'Stand-by'
             p_acc = 0
@@ -513,7 +508,7 @@ class Battery(object):
             soct    = [0.]
         # Store data
         self.meta['P'].append(sec/timestep*p_acc*self.ncells/1000)
-        self.meta['p_reject'].append(p_acc/1000*(1-sec/timestep) + p_rej)
+        self.meta['p_reject'].append(p_acc/1000*(1-sec/timestep) + p_rej/1000)
         self.meta['Q'].append(Qt[-1])
         self.meta['V1'].append(v1t[-1])
         self.meta['V2'].append(v2t[-1])
