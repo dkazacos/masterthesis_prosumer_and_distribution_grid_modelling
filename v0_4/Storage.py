@@ -78,6 +78,9 @@ class BatterySimple(object):
             self.state = 'Operational'
             return self.state
 
+    def set_battery_mode(self, mode):
+        self.signal = mode
+
     def get_battery_data(self):
         """
         Returns a pandas dataframe composed by object's meta dictionary
@@ -281,6 +284,9 @@ class Battery(object):
             else:
                 self.state = 'Operational'
                 return self.state
+
+    def set_battery_mode(self, mode):
+        self.signal = mode
 
     def get_battery_current_signal(self):
         return self.signal
