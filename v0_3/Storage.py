@@ -8,6 +8,7 @@ Created on Fri Feb 21 23:20:35 2020
 import pandas as pd
 import numpy as np
 from scipy.integrate import odeint
+import warnings
 
 class BatterySimple(object):
     """
@@ -24,22 +25,27 @@ class BatterySimple(object):
         initial state of charge of battery at beginning of simulation
         in percentage
 
+    min_max_SOC : tuple, default None
+        buffer interval for grid feed-in and supply simultaneity control in %
+
     Returns
     ----------
 
     """
 
-    state   = 'Fully charged'
+    state   = None
     signal  = 'self-consumption'
     p_kw    = None
 
     def __init__(self,
                  battery_capacity   = 7.5,
                  initial_SOC        = 100,
+                 min_max_SOC        = (0, 100),
                  ):
 
         self.battery_capacity   = battery_capacity      # capacity of battery [kWh]
         self.initial_SOC        = initial_SOC           # initial state of charge [%]
+        self.min_max_SOC        = min_max_SOC           # buffer SOC interval
         self.meta               = {
                                    'P'              : [],   # dictionary of data
                                    'p_reject'       : [],   # rejected by battery
@@ -53,7 +59,7 @@ class BatterySimple(object):
         """
         Returns the battery state of charge in %
         """
-        if len(self.meta['battery_SOC']) == 0:
+        if not self.meta['battery_SOC']:
             return self.initial_SOC
         else:
             return self.meta['battery_SOC'][-1]
@@ -62,7 +68,15 @@ class BatterySimple(object):
         """
         Returns the current state of a battery instance as a string log
         """
-        return self.state
+        if self.get_battery_soc() == 100:
+            self.state = 'Fully charged'
+            return self.state
+        elif self.get_battery_soc() == 0:
+            self.state = 'Depleted'
+            return self.state
+        elif (self.get_battery_soc()>0) and (self.get_battery_soc()<100):
+            self.state = 'Operational'
+            return self.state
 
     def get_battery_data(self):
         """
@@ -82,23 +96,60 @@ class BatterySimple(object):
         """
         self.battery_capacity = c
 
-    def bms(self):
+    def bms(self, h, c):
         """
         Battery Management System (BMS). Dictates the acceptance of
         rejection of power flow by the battery
         """
-        if self.p_kw < 0:
-            if self.state == 'Fully charged':
-                return 0
-            elif self.state in ['Operational', 'Depleted']:
-                return self.p_kw
-        elif self.p_kw > 0:
-            if self.state == 'Depleted':
-                return 0
-            elif self.state in ['Operational', 'Fully charged']:
-                return self.p_kw
-        elif self.p_kw == 0:
-            return self.p_kw
+        st  = self.get_battery_state()
+        soc = self.get_battery_soc()
+        p   = self.p_kw
+        if p < 0:
+            if st == 'Fully charged':
+                Q       = c*soc/100
+                p_acc   = 0
+                p_rej   = -p
+            elif st in ['Operational', 'Depleted']:
+                if self.signal == 'buffer-grid':
+                    upper_boundary = self.min_max_SOC[1]
+                    if soc >= upper_boundary:
+                        Q       = c*soc/100 - p*h*(100-soc)/(100-upper_boundary)
+                        p_acc   = p*(100-soc)/(100-upper_boundary)
+                        p_rej   = -p*(1- (100-soc)/(100-upper_boundary))
+                    else:
+                        Q       = c*soc/100 - p*h
+                        p_acc   = p
+                        p_rej   = 0
+                elif self.signal == 'self-consumption':
+                    Q       = c*soc/100 - p*h
+                    p_acc   = p
+                    p_rej   = 0
+        elif p > 0:
+            if st == 'Depleted':
+                Q       = c*soc/100
+                p_acc   = 0
+                p_rej   = -p
+            elif st in ['Operational', 'Fully charged']:
+                if self.signal == 'buffer-grid':
+                    lower_boundary = self.min_max_SOC[0]
+                    if soc <= lower_boundary:
+                        Q       = c*soc/100 - p*h*(soc/lower_boundary)
+                        p_acc   = p*(soc/lower_boundary)
+                        p_rej   = -p*(1-soc/lower_boundary)
+                    else:
+                        Q       = c*soc/100 - p*h
+                        p_acc   = p
+                        p_rej   = 0
+                elif self.signal == 'self-consumption':
+                    Q       = c*soc/100 - p*h
+                    p_acc   = p
+                    p_rej   = 0
+        elif p == 0:
+            Q       = c*soc/100
+            p_acc   = 0
+            p_rej   = 0
+
+        return p_acc, p_rej, soc, Q
 
     def process(self, p_kw, timestep):
 
@@ -106,98 +157,78 @@ class BatterySimple(object):
         Populates an object's meta dictionary with data comming from the
         power flow through the battery after BMS filtering
         """
-        self.p_kw   = p_kw
-        h           = timestep/3600
-        st          = self.get_battery_state()
-        p           = self.bms()
-        c           = self.battery_capacity
+        self.p_kw               = p_kw
+        h                       = timestep/3600
+        c                       = self.battery_capacity
+        p_acc, p_rej, soc, Q    = self.bms(h, c)
 
-        if p > 0: # discharge battery
-            if len(self.meta['battery_SOC']) == 0:
-                Q = c*self.get_battery_soc()/100 - p*h
-            else:
-                Q = c*self.meta['battery_SOC'][-1]/100 - p*h
+        if p_acc > 0: # discharge battery
             if Q < 0:
                 self.state = 'Depleted'
-                self.meta['p_reject'].append(Q/h)   # rejected negative power (negative for grid)
-                if len(self.meta['battery_SOC']) == 0:
-                    self.meta['P'].append(c/h)      # accepted positive power (discharge)
-                else:
-                    self.meta['P'].append((c*self.meta['battery_SOC'][-1]/100)/h)
+                self.meta['p_reject'].append(Q/h)          # rejected negative power (negative for grid)
+                self.meta['P'].append((c*soc/100)/h)
                 self.meta['battery_SOC'].append(0)
                 self.meta['log'].append('discharged, depleted')
             elif Q >= 0:
                 self.state = 'Operational'
-                self.meta['p_reject'].append(0)
-                self.meta['P'].append(p)
+                self.meta['p_reject'].append(p_rej)
+                self.meta['P'].append(p_acc)
                 self.meta['battery_SOC'].append(Q/c*100)
                 self.meta['log'].append('discharging')
 
-        elif p < 0: # charge battery
-            if len(self.meta['battery_SOC']) == 0:
-                Q = c*self.get_battery_soc()/100 - p*h
-            else:
-                Q = c*self.meta['battery_SOC'][-1]/100 - p*h
+        elif p_acc < 0: # charge battery
             if Q > c:
                 self.state = 'Fully charged'
-                self.meta['p_reject'].append((Q-c)/h)                       # rejected positive power (positive for grid)
-                self.meta['P'].append(-c*(1-self.meta['battery_SOC'][-1]/100)/h)    # accepted negative power (charge)
+                self.meta['p_reject'].append((Q-c)/h)      # rejected positive power (positive for grid)
+                self.meta['P'].append(-c*(1-soc/100)/h)    # accepted negative power (charge)
                 self.meta['battery_SOC'].append(100)
                 self.meta['log'].append('charged, fully charged')
             elif Q <= c:
                 self.state = 'Operational'
-                self.meta['p_reject'].append(0)
-                self.meta['P'].append(p)
+                self.meta['p_reject'].append(p_rej)
+                self.meta['P'].append(p_acc)
                 self.meta['battery_SOC'].append(Q/c*100)
                 self.meta['log'].append('charging')
 
-        elif p == 0: # no flow in/out battery
-            if st == 'Fully charged':
-                self.meta['battery_SOC'].append(100)
-                self.meta['p_reject'].append(-p_kw)                         # rejected at charging (positive for grid)
-            elif st == 'Depleted':
-                self.meta['battery_SOC'].append(0)
-                self.meta['p_reject'].append(-p_kw)                         # rejected at discharging (negative for grid)
-            elif st == 'Operational':
-                if len(self.meta['battery_SOC']) == 0:
-                    self.meta['battery_SOC'].append(100)
-                else:
-                    self.meta['battery_SOC'].append(self.meta['battery_SOC'][-1])
-            self.meta['P'].append(p)
+        elif not p_acc: # no flow in/out battery
+            self.meta['battery_SOC'].append(soc)
+            self.meta['p_reject'].append(p_rej)
+            self.meta['P'].append(p_acc)
             self.meta['log'].append('No power flow through battery')
 
 class Battery(object):
 
     state       = 'Stand-by'
     signal      = 'self-consumption'
-    overload    = False
-    p_kw        = None
+    overload    = False # boolean
+    p_kw        = None  # float
 
-    def __init__(self, ncells=1000, cn=2.55, initial_SOC=100, vn=3.7, dco=3.0, cco=4.2, max_c_rate=10):
+    def __init__(self, battery_capacity=7.5, initial_SOC=100, min_max_SOC=(0,100),
+                 cn=2.55, vn=3.7, dco=3.0, cco=4.2, max_c_rate=10):
 
         """
         Default properties of battery cell: Li-ion CGR18650E Panasonic
 
-        Hint: Initial state of charge = 100%
         """
 
-        # self.p_kw         = p_kw          # power exchange [kW]
-        self.ncells         = ncells        # number of cells in battery pack
-        self.cn             = cn            # nominal capacity of Li.ion cell [Ah]
-        self.initial_SOC    = initial_SOC   # initial state of charge [%]
-        self.vn             = vn            # nominal voltage of single [V]
-        self.dco            = dco           # discharge cut-off [V]
-        self.cco            = cco           # charge cut-off [V]
-        self.max_c_rate     = max_c_rate    # determines max allowed current
-        self.meta           = {'P'              : [], # Store Power accepted by battery [kW]
-                               'p_reject'       : [], # Store Power rejected by battery [kW]
-                               'Q'              : [], # Store charge of cell [Ah]
-                               'V1'             : [], # Store voltage of RC-1st of cell [V]
-                               'V2'             : [], # Store voltage of RC-2nd of cell [V]
-                               'Vcell'          : [], # Store cell voltage [V]
-                               'battery_SOC'    : [], # Store cell SOC [%]
-                               }
-        # self.signal                = signal    # resembles signals from outside
+        self.battery_capacity   = battery_capacity  # Capacity of battery [kWh]
+        self.initial_SOC        = initial_SOC       # initial state of charge [%]
+        self.min_max_SOC        = min_max_SOC       # interval for buffer-grid strategy [%]
+        self.cn                 = cn                # nominal capacity of Li.ion cell [Ah]
+        self.vn                 = vn                # nominal voltage of single [V]
+        self.dco                = dco               # discharge cut-off [V]
+        self.cco                = cco               # charge cut-off [V]
+        self.max_c_rate         = max_c_rate        # determines max allowed current
+        self.meta               = {'P'              : [], # Store Power accepted by battery [kW]
+                                   'p_reject'       : [], # Store Power rejected by battery [kW]
+                                   'Q'              : [], # Store charge of cell [Ah]
+                                   'V1'             : [], # Store voltage of RC-1st of cell [V]
+                                   'V2'             : [], # Store voltage of RC-2nd of cell [V]
+                                   'Vcell'          : [], # Store cell voltage [V]
+                                   'battery_SOC'    : [], # Store cell SOC [%]
+                                   }
+        
+        self.ncells = self.battery_capacity/(self.cn*self.vn)*1000 # number of cells in battery pack
 
     # =========================================================================
 
@@ -232,33 +263,58 @@ class Battery(object):
     # =========================================================================
 
     def get_battery_soc(self):
-        if len(self.meta['battery_SOC']) == 0:
-            return self.initial_SOC # TODO! Try include parameter for user on this topic
+        if not self.meta['battery_SOC']:
+            return self.initial_SOC
         else:
             return self.meta['battery_SOC'][-1]
 
     def get_battery_state(self):
-        return self.state
+        if self.get_battery_soc() == 100:
+            self.state = 'Fully charged'
+            return self.state
+        elif self.get_battery_soc() == 0:
+            self.state = 'Depleted'
+            return self.state
+        elif (self.get_battery_soc() > 0) and (self.get_battery_soc() < 100):
+            if self.state == 'Stand-by':
+                return self.state
+            else:
+                self.state = 'Operational'
+                return self.state
 
-    def get_battery_capacity(self):
+    def get_battery_current_signal(self):
+        return self.signal
+
+    def get_battery_cell_capacity(self):
         return self.cn
 
-    def get_battery_ccov(self):
+    def get_battery_cell_cut_off_charge(self):
         return self.cco
 
-    def get_battery_dcov(self):
+    def get_battery_cell_cut_off_discharge(self):
         return self.dco
 
-    def get_battery_rated_energy_wh(self):
-        return self.cn*self.vn*self.ncells
+    def get_battery_capacity(self):
+        return self.battery_capacity
+
+    def set_battery_capacity(self, c):
+        """
+        init battery capacity with desired value c in kWh
+        """
+        self.battery_capacity = c
 
     def get_battery_data(self):
         return pd.DataFrame(self.meta)
 
-    def get_battery_ncells(self):
-        return self.ncells
+    def get_battery_number_of_li_ion_cells(self):
+        if not isinstance(self.ncells, int):
+            warnings.warn('Number of cells is an approximation. Chosen battery ' +
+                          'capacity is inconsistent with number of cells since ' +
+                          'number of cells needs to be an integer. True number ' +
+                          'of cells is %s' % self.ncells)
+        return np.ceil(self.ncells)
 
-    def bms(self, v_cell, p_w):
+    def bms(self, v_cell, p_w, Q):
         """
         Battery Management System. Defines safety operation of battery
         charge and discharge
@@ -268,27 +324,67 @@ class Battery(object):
 
         Returns cell active power In/Out
         """
-
-        if p_w/self.ncells < 0:
-            if v_cell < self.cco:
+        num_cells   = self.ncells
+        st          = self.get_battery_state()
+        soc         = Q/(self.cn * 36)
+        if p_w/num_cells < 0:           # charge battery p < 0
+            if st == 'Fully charged':
+                p_acc = 0
+                p_rej = -p_w
+            elif st in ['Operational', 'Depleted', 'Stand-by']:
                 self.state = 'Operational'
-                return p_w/self.ncells
-            elif v_cell >= self.cco:
-                self.state = 'Fully charged'
-                # TODO! place-holder for switch
-                return 0
-
-        elif p_w/self.ncells > 0:
-            if v_cell > self.dco:
+                if self.signal == 'buffer-grid':
+                    upper_boundary = self.min_max_SOC[1]
+                    if soc >= upper_boundary and soc < 100:
+                        p_acc = p_w/num_cells * (100-soc)/(100-upper_boundary)
+                        p_rej = -p_w/num_cells * (1-(100-soc)/(100-upper_boundary))
+                    elif soc >= 100:
+                        self.state = 'Fully charged'
+                        p_acc = 0
+                        p_rej = -p_w
+                    else:
+                        p_acc = p_w/num_cells
+                        p_rej = 0   
+                elif self.signal == 'self-consumption':
+                    if soc < 100:
+                        p_acc = p_w/num_cells
+                        p_rej = 0
+                    elif soc >= 100:
+                        self.state = 'Fully charged'
+                        p_acc = 0
+                        p_rej = -p_w
+        elif p_w/num_cells > 0:         # discharge battery p > 0
+            if st == 'Depleted':
+                p_acc = 0
+                p_rej = -p_w
+            elif st in ['Operational', 'Fully charged', 'Stand-by']:
                 self.state = 'Operational'
-                return p_w/self.ncells
-            elif v_cell <= self.dco:
-                self.state = 'Depleted'
-                # TODO! place-holder for switch
-                return 0
-        elif p_w == 0:
+                if self.signal == 'buffer-grid':
+                    lower_boundary = self.min_max_SOC[0]
+                    if soc <= lower_boundary and soc > 0:
+                        p_acc = p_w/num_cells * (soc/lower_boundary)
+                        p_rej = -p_w/num_cells * (1-soc/lower_boundary)
+                    elif soc <= 0:
+                        self.state = 'Depleted'
+                        p_acc = 0
+                        p_rej = -p_w
+                    else:
+                        p_acc = p_w/num_cells
+                        p_rej = 0
+                elif self.signal == 'self-consumption':
+                    if soc > 0:
+                        p_acc = p_w/num_cells
+                        p_rej = 0
+                    elif soc <= 0:
+                        self.state = 'Depleted'
+                        p_acc = 0
+                        p_rej = -p_w
+        elif p_w/num_cells == 0:
             self.state = 'Stand-by'
-            return 0
+            p_acc = 0
+            p_rej = 0
+
+        return p_acc, p_rej
 
     def icell(self, p_i, v_cell):
         """
@@ -360,7 +456,7 @@ class Battery(object):
         rs = 0.078          # Serial resistance [Ohm]: ohmic resistance of cell
         t  = np.linspace(1, timestep, timestep)
 
-        if len(self.meta['battery_SOC']) == 0:
+        if not self.meta['battery_SOC']:
             Qo     = self.cn*self.get_battery_soc()/100 * 3600      # initial condition for Q
             v_cell = self.cco
         else:
@@ -368,16 +464,18 @@ class Battery(object):
         if self.state == 'Stand-by':
             v1o    = 0                   # initial condition for V1
             v2o    = 0                   # initial condition for V2
-            if len(self.meta['battery_SOC']) > 0:
+            if not self.meta['battery_SOC']:
                 v_cell = self.cco - (1.2 - Qo/(self.cn * 3600))
+            else:
+                v_cell = self.meta['Vcell'][-1]
         else:
             v1o    = self.meta['V1'][-1] # initial condition for V1
             v2o    = self.meta['V2'][-1] # initial condition for V2
             v_cell = self.meta['Vcell'][-1]
 
         p_w             = p_kw*1000
-        p_i             = self.bms(v_cell, p_w)
-        icell           = self.icell(p_i, v_cell)
+        p_acc, p_rej    = self.bms(v_cell, p_w, Qo)
+        icell           = self.icell(p_acc, v_cell)
         y0              = Qo, v1o, v2o
         args            = (icell,)
         sol             = odeint(self.cell_voltage, y0, t, args)
@@ -409,8 +507,8 @@ class Battery(object):
             v2t     = [0]
             soct    = [0.]
         # Store data
-        self.meta['P'].append(sec/timestep*p_kw)
-        self.meta['p_reject'].append(-p_kw*(1-sec/timestep))
+        self.meta['P'].append(sec/timestep*p_acc*self.ncells/1000)
+        self.meta['p_reject'].append(p_acc/1000*(1-sec/timestep) + p_rej/1000)
         self.meta['Q'].append(Qt[-1])
         self.meta['V1'].append(v1t[-1])
         self.meta['V2'].append(v2t[-1])

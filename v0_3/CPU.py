@@ -43,7 +43,7 @@ class CPU(BatterySimple, PVgen):
         initial state of charge of battery at beginning of simulation
         in percentage
 
-    pv_kw : float, default None
+    installed_pv : float, default None
         installed peak power mounted on roof top in kW
 
     num_panels : int default None
@@ -69,7 +69,7 @@ class CPU(BatterySimple, PVgen):
 
     """
 
-    signal   = 'self-consumption'   # also: 'grid high voltage', 'reactive feed-in'
+    signal   = 'self-consumption'   # also: 'buffer-grid', 'reactive feed-in'
     strategy = 'pv-priority'        # also: 'grid-friendly', 'cooperative'
 
     def __init__(self,
@@ -78,13 +78,13 @@ class CPU(BatterySimple, PVgen):
                   switch_pv         = None,
                   battery_capacity  = 7.5,
                   initial_SOC       = 100,
-                  ncells            = 1000,
+                  min_max_SOC       = (0, 100),
                   cn                = 2.55,
                   vn                = 3.7,
                   dco               = 3.0,
                   cco               = 4.2,
                   max_c_rate        = 10,
-                  pv_kw             = None,
+                  installed_pv             = None,
                   num_panels        = None,
                   panel_peak_p      = 0.3,
                   pv_eff            = 0.18,
@@ -98,13 +98,13 @@ class CPU(BatterySimple, PVgen):
         self.switch_pv          = switch_pv
         self.battery_capacity   = battery_capacity
         self.initial_SOC        = initial_SOC
-        self.ncells             = ncells
+        self.min_max_SOC        = min_max_SOC
         self.cn                 = cn
         self.vn                 = vn
         self.dco                = dco
         self.cco                = cco
         self.max_c_rate         = max_c_rate
-        self.pv_kw              = pv_kw
+        self.installed_pv              = installed_pv
         self.num_panels         = num_panels
         self.panel_peak_p       = panel_peak_p
         self.pv_eff             = pv_eff
@@ -115,19 +115,21 @@ class CPU(BatterySimple, PVgen):
             self.battery = BatterySimple(
                                          battery_capacity   = self.battery_capacity,
                                          initial_SOC        = self.initial_SOC,
+                                         min_max_SOC        = self.min_max_SOC,
                                          )
         elif self.b_type == "phys":
             self.battery = Battery(
-                                    ncells      = self.ncells,
-                                    cn          = self.cn,
-                                    initial_SOC = self.initial_SOC,
-                                    vn          = self.vn,
-                                    dco         = self.dco,
-                                    cco         = self.cco,
-                                    max_c_rate  = self.max_c_rate,
+                                    battery_capacity    = self.battery_capacity,
+                                    initial_SOC         = self.initial_SOC,
+                                    min_max_SOC         = self.min_max_SOC,
+                                    cn                  = self.cn,
+                                    vn                  = self.vn,
+                                    dco                 = self.dco,
+                                    cco                 = self.cco,
+                                    max_c_rate          = self.max_c_rate,
                                     )
         self.pvgen  = PVgen(
-                            pv_kw           = self.pv_kw,
+                            installed_pv           = self.installed_pv,
                             num_panels      = self.num_panels,
                             panel_peak_p    = self.panel_peak_p,
                             pv_eff          = self.pv_eff,
@@ -135,8 +137,8 @@ class CPU(BatterySimple, PVgen):
                             pv_total_loss   = self.pv_total_loss,
                             module_area     = self.module_area,
                             )
-        if self.pvgen.pv_kw != self.pv_kw:
-            self.pv_kw = self.pvgen.pv_kw
+        if self.pvgen.installed_pv != self.installed_pv:
+            self.installed_pv = self.pvgen.installed_pv
         self.meta   = {
                        'timestamp'          : [],
                        'p_load'             : [],
@@ -162,15 +164,15 @@ class CPU(BatterySimple, PVgen):
         self.battery_capacity = c
         self.battery.battery_capacity = self.battery_capacity
 
-    def set_pv_installed_power(self, pv_kw):
+    def set_pv_installed_power(self, installed_pv):
         """
-        init parent PVgen installed pv power with desired value pv_kw in kW
+        init parent PVgen installed pv power with desired value installed_pv in kW
         Careful: pv installed power obeys the limitations of the panel
         characteristics. Make sure to set a power that is multiple of
         PVgen panel_peak_p attribute
         """
-        self.pv_kw = pv_kw
-        self.pvgen.pv_kw = self.pv_kw
+        self.installed_pv = installed_pv
+        self.pvgen.installed_pv = self.installed_pv
 
     def add_timestamp(self, timestamp):
         """
@@ -253,7 +255,7 @@ class CPU(BatterySimple, PVgen):
             timeseries of power requirements of Prosumer in kWh
         """
 
-        i        = 0
+        i = 0
         while self.signal =='self-consumption':
             irr_sun = irrad_data.iloc[i]
             p_load  = load_demand.iloc[i]
@@ -321,18 +323,17 @@ if __name__ == "__main__":
     # ========================================================================
     # Test model and get results
     META = {
-            'pv_kw'         : 2.1,
+            'installed_pv'       : 2.1,
+            'battery_capacity'   : 3.5,
             }
     psimp = CPU(
-                b_type             = 'linear',
-                battery_capacity   = 3.5,
+                b_type           = 'linear',
                 **META,
                 )
     timestep = timegrid(irrad_data)
 
     # pphys = CPU(
     #             b_type = 'phys',
-    #             ncells = 1000,
     #             **META,
     #             )
 

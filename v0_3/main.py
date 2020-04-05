@@ -46,19 +46,18 @@ if any(',' in string for string in load_demand):
 # ========================================================================
 # Test model and get results
 META = {
-        'pv_kw'         : 2.1,
+        'installed_pv'      : 2.1,
+        'battery_capacity'  : 3.5,
+        'initial_SOC'       : 75,
+        'min_max_SOC'       : (20, 80)
         }
 psimp = CPU(
-            b_type              = 'linear',
-            battery_capacity    = 3.5,
-            initial_SOC         = 75,
+            b_type          = 'linear',
             **META,
             )
-timestep = timegrid(irrad_data)
 
 # pphys = CPU(
 #             b_type = 'phys',
-#             ncells = 1000,
 #             **META,
 #             )
 
@@ -67,6 +66,7 @@ timestep = timegrid(irrad_data)
 #                   load_data = load_demand,
 #                   )
 
+timestep = timegrid(irrad_data)
 for i, (irr, ld) in enumerate(zip(irrad_data, load_demand)):
     psimp.run_pflow(
                     irrad_data  = irr,
