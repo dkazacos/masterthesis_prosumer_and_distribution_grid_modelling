@@ -43,6 +43,13 @@ class CPU(BatterySimple, PVgen):
         initial state of charge of battery at beginning of simulation
         in percentage
 
+    min_max_SOC : tuple/list/array, default (0, 100)
+        limits for state of charge of battery outside which conditions of
+        signal 'buffer-grid' apply. This conditions will only affect to the
+        model performance in case signal is explicitly set to 'buffer-grid'.
+        Interval is measured in percentage of the SOC at which to start
+        applying the mentioned conditions
+
     installed_pv : float, default None
         installed peak power mounted on roof top in kW
 
@@ -69,8 +76,10 @@ class CPU(BatterySimple, PVgen):
 
     """
 
-    signal   = 'self-consumption'   # also: 'buffer-grid', 'reactive feed-in'
-    strategy = 'pv-priority'        # also: 'grid-friendly', 'cooperative'
+    # Signal is passed to the battery for consequent operation mode
+    signal   = 'self-consumption'   # also: 'buffer-grid' 
+    # Strategy is passed to the pv system for consequent operation mode
+    strategy = 'self-consumption'   # also: 'full-curtailment', 'partial-curtailment', 'reactive feed-in'
 
     def __init__(self,
                   b_type            = 'linear',
@@ -84,7 +93,7 @@ class CPU(BatterySimple, PVgen):
                   dco               = 3.0,
                   cco               = 4.2,
                   max_c_rate        = 10,
-                  installed_pv             = None,
+                  installed_pv      = None,
                   num_panels        = None,
                   panel_peak_p      = 0.3,
                   pv_eff            = 0.18,
@@ -104,7 +113,7 @@ class CPU(BatterySimple, PVgen):
         self.dco                = dco
         self.cco                = cco
         self.max_c_rate         = max_c_rate
-        self.installed_pv              = installed_pv
+        self.installed_pv       = installed_pv
         self.num_panels         = num_panels
         self.panel_peak_p       = panel_peak_p
         self.pv_eff             = pv_eff
@@ -129,7 +138,7 @@ class CPU(BatterySimple, PVgen):
                                     max_c_rate          = self.max_c_rate,
                                     )
         self.pvgen  = PVgen(
-                            installed_pv           = self.installed_pv,
+                            installed_pv    = self.installed_pv,
                             num_panels      = self.num_panels,
                             panel_peak_p    = self.panel_peak_p,
                             pv_eff          = self.pv_eff,
@@ -174,6 +183,9 @@ class CPU(BatterySimple, PVgen):
         self.installed_pv = installed_pv
         self.pvgen.installed_pv = self.installed_pv
 
+    def set_prosumer_mode(self, mode):
+        self.signal = mode
+
     def add_timestamp(self, timestamp):
         """
         Extracts the datetime string at every time step of the simulation and
@@ -207,10 +219,16 @@ class CPU(BatterySimple, PVgen):
 
         p_pv    = self.pvgen.production(irr_sun, timestep)
         p_flow  = p_load - p_pv
+
         self.battery.process(p_flow, timestep)
         self.meta['p_pv'].append(p_pv)
         self.meta['p_load'].append(p_load)
-        self.meta['p_grid_flow'].append(self.battery.meta['p_reject'][-1])
+        if self.strategy == 'self-consumption':
+            self.meta['p_grid_flow'].append(self.battery.meta['p_reject'][-1])
+            self.pvgen.meta['p_curtail'].append(0)
+        elif self.strategy == 'curtailment':
+            self.meta['p_grid_flow'].append(0)
+            self.pvgen.meta['p_curtail'].append(self.battery.meta['p_reject'][-1])
         self.meta['p_battery_flow'].append(self.battery.meta['P'][-1])
         self.meta['battery_SOC'].append(self.battery.meta['battery_SOC'][-1])
 
@@ -284,10 +302,13 @@ class CPU(BatterySimple, PVgen):
 
         timestep : float, default None
             number of seconds between every time step of the simulation
+
+        timestamp : str, default None
+            timestamp corresponding to timestep of simulation
         """
-        if self.signal == 'self-consumption':
-            self.add_timestamp(timestamp)
-            return self.control(irrad_data, load_data, timestep)
+
+        self.add_timestamp(timestamp)
+        self.control(irrad_data, load_data, timestep)
 
 if __name__ == "__main__":
 
@@ -330,6 +351,7 @@ if __name__ == "__main__":
                 b_type           = 'linear',
                 **META,
                 )
+    psimp.strategy = 'curtailment'
     timestep = timegrid(irrad_data)
 
     # pphys = CPU(
