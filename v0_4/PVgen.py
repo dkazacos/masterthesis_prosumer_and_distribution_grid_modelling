@@ -54,6 +54,8 @@ class PVgen(object):
         production() method
     """
 
+    strategy = 'self-consumption' # also: curtailment 
+
     def __init__(self,
                  installed_pv   = None,
                  num_panels     = None,
@@ -74,6 +76,7 @@ class PVgen(object):
         self.meta           = {
                                'irr_sol'    : [],
                                'p_prod'     : [],
+                               'p_curtail'  : [],
                                }
         if not self.installed_pv:
             if self.num_panels:
