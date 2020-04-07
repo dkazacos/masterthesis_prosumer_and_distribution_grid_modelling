@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from utils.function_repo import timegrid, parse_hours
 from Storage import BatterySimple, Battery
 from PVgen import PVgen
+from recorder import Recorder
 
 class CPU(BatterySimple, PVgen):
 
@@ -45,8 +46,8 @@ class CPU(BatterySimple, PVgen):
 
     min_max_SOC : tuple/list/array, default (0, 100)
         limits for state of charge of battery outside which conditions of
-        signal 'buffer-grid' apply. This conditions will only affect to the
-        model performance in case signal is explicitly set to 'buffer-grid'.
+        battery_mode 'buffer-grid' apply. This conditions will only affect to the
+        model performance in case battery_mode is explicitly set to 'buffer-grid'.
         Interval is measured in percentage of the SOC at which to start
         applying the mentioned conditions
 
@@ -76,8 +77,8 @@ class CPU(BatterySimple, PVgen):
 
     """
 
-    # Signal is passed to the battery for consequent operation mode
-    signal   = 'self-consumption'   # also: 'buffer-grid' 
+    # battery_mode is passed to the battery for consequent operation mode
+    battery_mode   = 'self-consumption'   # also: 'buffer-grid' 
     # Strategy is passed to the pv system for consequent operation mode
     strategy = 'self-consumption'   # also: 'full-curtailment', 'partial-curtailment', 'reactive feed-in'
 
@@ -148,23 +149,24 @@ class CPU(BatterySimple, PVgen):
                             )
         if self.pvgen.installed_pv != self.installed_pv:
             self.installed_pv = self.pvgen.installed_pv
-        self.meta   = {
-                       'timestamp'          : [],
-                       'p_load'             : [],
-                       'p_pv'               : [],
-                       'p_battery_flow'     : [],
-                       'battery_SOC'        : [],
-                       'battery_status'     : [],
-                       'p_grid_flow'        : [],
-                       'grid_status'        : [],
-                       'log'                : [],
-                       }
+        self.recorder = Recorder(
+                                'timestamp',
+                                'p_load',
+                                'p_pv',
+                                'p_battery_flow',
+                                'battery_SOC',
+                                'battery_status',
+                                'p_grid_flow',
+                                'grid_status',
+                                'log',
+                                )
 
     def get_cpu_data(self):
         """
-        Returns pandas dataframe composed by object's meta dictionary of data
+        Returns pandas dataframe composed by object's recorder meta dictionary
+        of data
         """
-        return pd.DataFrame(self.meta)
+        return self.recorder.get_data()
 
     def set_battery_capacity(self, c):
         """
@@ -183,21 +185,26 @@ class CPU(BatterySimple, PVgen):
         self.installed_pv = installed_pv
         self.pvgen.installed_pv = self.installed_pv
 
-    def set_prosumer_mode(self, mode):
-        self.signal = mode
+    def set_battery_mode(self, mode):
+        self.battery.set_battery_mode(mode)
+        self.battery_mode = mode
+
+    def set_pvgen_strategy(self, strategy):
+        self.pvgen.strategy = strategy
+        self.strategy = strategy
 
     def add_timestamp(self, timestamp):
         """
         Extracts the datetime string at every time step of the simulation and
-        appends it to object's meta dictionary of data for final call to
-        results
+        appends it to object's recorder meta dictionary of data for final call
+        to results
         
         Parameters
         ----------
         timestep : float, default None
             number of seconds between every time step of the simulation
         """
-        self.meta['timestamp'].append(timestamp)
+        self.recorder.record(timestamp = timestamp)
 
     def control(self, irr_sun, p_load, timestep):
         """
@@ -221,41 +228,41 @@ class CPU(BatterySimple, PVgen):
         p_flow  = p_load - p_pv
 
         self.battery.process(p_flow, timestep)
-        self.meta['p_pv'].append(p_pv)
-        self.meta['p_load'].append(p_load)
+        self.recorder.record(p_pv   = p_pv,
+                             p_load = p_load)
         if self.strategy == 'self-consumption':
-            self.meta['p_grid_flow'].append(self.battery.meta['p_reject'][-1])
-            self.pvgen.meta['p_curtail'].append(0)
+            self.recorder.record(p_grid_flow = self.battery.recorder.meta['p_reject'][-1])
+            self.pvgen.recorder.record(p_curtail = 0)
         elif self.strategy == 'curtailment':
-            self.meta['p_grid_flow'].append(0)
-            self.pvgen.meta['p_curtail'].append(self.battery.meta['p_reject'][-1])
-        self.meta['p_battery_flow'].append(self.battery.meta['P'][-1])
-        self.meta['battery_SOC'].append(self.battery.meta['battery_SOC'][-1])
+            self.recorder.record(p_grid_flow = 0)
+            self.pvgen.recorder.record(p_curtail = self.battery.recorder.meta['p_reject'][-1])
+        self.recorder.record(p_battery_flow = self.battery.recorder.meta['P'][-1],
+                             battery_SOC = self.battery.recorder.meta['battery_SOC'][-1])
 
-        if p_flow > 0 and self.battery.meta['p_reject'][-1] < 0: # battery rejects discharging
-            self.meta['grid_status'].append(-1)
-            if self.meta['p_battery_flow'][-1] == 0:
-                self.meta['battery_status'].append(0)
-                self.meta['log'].append('supply from grid')
+        if p_flow > 0 and self.battery.recorder.meta['p_reject'][-1] < 0: # battery rejects discharging
+            self.recorder.record(grid_status = -1)
+            if self.recorder.meta['p_battery_flow'][-1] == 0:
+                self.recorder.record(battery_status = 0,
+                                     log = 'supply from grid')
             else:
-                self.meta['battery_status'].append(-1)
-                self.meta['log'].append('battery discharge and supply from grid')
-        elif p_flow > 0 and self.battery.meta['p_reject'][-1] == 0: # battery accepts discharging
-            self.meta['grid_status'].append(0)
-            self.meta['battery_status'].append(-1)
-            self.meta['log'].append('demand satisfied by battery. No grid flow')
-        elif p_flow < 0 and self.battery.meta['p_reject'][-1] > 0: # battery rejects charging
-            self.meta['grid_status'].append(1)
-            if self.meta['p_battery_flow'][-1] == 0:
-                self.meta['battery_status'].append(0)
-                self.meta['log'].append('grid feed-in')
+                self.recorder.record(battery_status = -1,
+                                     log = 'battery discharge and supply from grid')
+        elif p_flow > 0 and self.battery.recorder.meta['p_reject'][-1] == 0: # battery accepts discharging
+            self.recorder.record(grid_status = 0,
+                                 battery_status = -1,
+                                 log = 'demand satisfied by battery. No grid flow')
+        elif p_flow < 0 and self.battery.recorder.meta['p_reject'][-1] > 0: # battery rejects charging
+            self.recorder.record(grid_status = 1)
+            if self.recorder.meta['p_battery_flow'][-1] == 0:
+                self.recorder.record(battery_status = 0,
+                                     log = 'grid feed-in')
             else:
-                self.meta['battery_status'].append(1)
-                self.meta['log'].append('battery charge and grid feed-in')
-        elif p_flow < 0 and self.battery.meta['p_reject'][-1] == 0: # battery accepts charging
-            self.meta['grid_status'].append(0)
-            self.meta['battery_status'].append(1)
-            self.meta['log'].append('surplus absorbed by battery. No grid flow')
+                self.recorder.record(battery_status = 1,
+                                     log = 'battery charge and grid feed-in')
+        elif p_flow < 0 and self.battery.recorder.meta['p_reject'][-1] == 0: # battery accepts charging
+            self.recorder.record(grid_status = 0,
+                                 battery_status = 1,
+                                 log = 'surplus absorbed by battery. No grid flow')
 
     def run_static_sim(self, irrad_data, load_data, timestep):
         """
@@ -274,22 +281,22 @@ class CPU(BatterySimple, PVgen):
         """
 
         i = 0
-        while self.signal =='self-consumption':
+        while self.battery_mode =='self-consumption':
             irr_sun = irrad_data.iloc[i]
             p_load  = load_demand.iloc[i]
             self.control(irr_sun, p_load, timestep)
             self.add_timestamp(irrad_data.index[i])
             i += 1
             if i >= len(irrad_data) or i >= len(load_demand):
-                self.signal = 'ended'
+                self.battery_mode = 'ended'
                 break
-            # TODO! introduce logic for variation of signals
+            # TODO! introduce logic for variation of battery_modes
 
     def run_pflow(self, irrad_data, load_data, timestep, timestamp):
         """
         Runs the data transfer at a given timestamp of the simulation. This
         method calls CPU's control in a discrete fashion and allows for
-        breaking and continuing the process given external signals
+        breaking and continuing the process given external battery_modes
         
         Parameters
         ----------
@@ -344,14 +351,20 @@ if __name__ == "__main__":
     # ========================================================================
     # Test model and get results
     META = {
-            'installed_pv'       : 2.1,
-            'battery_capacity'   : 3.5,
+            'installed_pv'      : 2.1,
+            'battery_capacity'  : 3.5,
+            'min_max_SOC'       : (20, 80),
+            'initial_SOC'       : 90,
             }
     psimp = CPU(
                 b_type           = 'linear',
                 **META,
                 )
-    psimp.strategy = 'curtailment'
+    psimp.set_pvgen_strategy('curtailment')
+    # psimp.set_pvgen_strategy('self-consumption')
+    # psimp.set_battery_mode('self-consumption')
+    psimp.set_battery_mode('buffer-grid')
+
     timestep = timegrid(irrad_data)
 
     # pphys = CPU(
