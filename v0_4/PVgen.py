@@ -9,6 +9,7 @@ import math
 import decimal
 import pandas as pd
 import warnings
+from recorder import Recorder
 
 class PVgen(object):
     
@@ -73,11 +74,14 @@ class PVgen(object):
         self.roof_area      = roof_area
         self.pv_total_loss  = pv_total_loss
         self.module_area    = module_area
-        self.meta           = {
-                               'irr_sol'    : [],
-                               'p_prod'     : [],
-                               'p_curtail'  : [],
-                               }
+        self.recorder       = Recorder('irr_sol',
+                                       'p_prod',
+                                       'p_curtail')
+        # self.meta           = {
+        #                        'irr_sol'    : [],
+        #                        'p_prod'     : [],
+        #                        'p_curtail'  : [],
+        #                        }
         if not self.installed_pv:
             if self.num_panels:
                 self.installed_pv = self.num_panels * self.panel_peak_p
@@ -141,9 +145,10 @@ class PVgen(object):
 
     def get_pv_data(self):
         """
-        Returns pandas dataframe composed by object's meta dictionray of data
+        Returns pandas dataframe composed by object's recorder meta dictionray
+        of data
         """
-        return pd.DataFrame(self.meta)
+        return pd.DataFrame(self.recorder.meta)
 
     def production(self, irr_sol, timestep):
         """
@@ -169,6 +174,8 @@ class PVgen(object):
         else:
             p_prod = p_sun_kw * (1. - self.pv_total_loss)
 
-        self.meta['irr_sol'].append(irr_sol)
-        self.meta['p_prod'].append(p_prod)
+        self.recorder.record(irr_sol=irr_sol,
+                             p_prod=p_prod)
+        # self.meta['irr_sol'].append(irr_sol)
+        # self.meta['p_prod'].append(p_prod)
         return p_prod
