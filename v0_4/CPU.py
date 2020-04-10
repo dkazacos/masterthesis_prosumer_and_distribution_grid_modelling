@@ -96,11 +96,7 @@ class CPU(object):
                   max_c_rate        = 10,
                   installed_pv      = None,
                   num_panels        = None,
-                  panel_peak_p      = 0.3,
-                  pv_eff            = 0.18,
-                  roof_area         = None,
                   pv_total_loss     = 0.0035,
-                  module_area       = 1.96,
                   ):
 
         self.b_type             = b_type
@@ -116,11 +112,7 @@ class CPU(object):
         self.max_c_rate         = max_c_rate
         self.installed_pv       = installed_pv
         self.num_panels         = num_panels
-        self.panel_peak_p       = panel_peak_p
-        self.pv_eff             = pv_eff
-        self.roof_area          = roof_area
         self.pv_total_loss      = pv_total_loss
-        self.module_area        = module_area
         if self.b_type == "linear":
             self.battery = BatterySimple(
                                          battery_capacity   = self.battery_capacity,
@@ -141,11 +133,7 @@ class CPU(object):
         self.pvgen  = PVgen(
                             installed_pv    = self.installed_pv,
                             num_panels      = self.num_panels,
-                            panel_peak_p    = self.panel_peak_p,
-                            pv_eff          = self.pv_eff,
-                            roof_area       = self.roof_area,
                             pv_total_loss   = self.pv_total_loss,
-                            module_area     = self.module_area,
                             )
         if self.pvgen.installed_pv != self.installed_pv:
             self.installed_pv = self.pvgen.installed_pv
