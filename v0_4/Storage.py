@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 from scipy.integrate import odeint
 import warnings
+from recorder import Recorder
 
 class BatterySimple(object):
     """
@@ -34,7 +35,7 @@ class BatterySimple(object):
     """
 
     state   = None
-    signal  = 'self-consumption'
+    mode  = 'self-consumption'
     p_kw    = None
 
     def __init__(self,
@@ -46,12 +47,12 @@ class BatterySimple(object):
         self.battery_capacity   = battery_capacity      # capacity of battery [kWh]
         self.initial_SOC        = initial_SOC           # initial state of charge [%]
         self.min_max_SOC        = min_max_SOC           # buffer SOC interval
-        self.meta               = {
-                                   'P'              : [],   # dictionary of data
-                                   'p_reject'       : [],   # rejected by battery
-                                   'battery_SOC'    : [],   # state of charge
-                                   'log'            : [],   # occurrences
-                                   }
+        self.recorder           = Recorder(
+                                           'P',         # dictionary of data
+                                           'p_reject',  # rejected by battery
+                                           'battery_SOC', # state of charge
+                                           'log',       # occurrences
+                                           )
         if self.battery_capacity < 0:
             raise AttributeError('Battery capacity cannot be a negative number')
 
@@ -59,10 +60,10 @@ class BatterySimple(object):
         """
         Returns the battery state of charge in %
         """
-        if not self.meta['battery_SOC']:
+        if not self.recorder.meta['battery_SOC']:
             return self.initial_SOC
         else:
-            return self.meta['battery_SOC'][-1]
+            return self.recorder.meta['battery_SOC'][-1]
 
     def get_battery_state(self):
         """
@@ -79,13 +80,13 @@ class BatterySimple(object):
             return self.state
 
     def set_battery_mode(self, mode):
-        self.signal = mode
+        self.mode = mode
 
     def get_battery_data(self):
         """
-        Returns a pandas dataframe composed by object's meta dictionary
+        Returns a pandas dataframe composed by object's recorder meta dictionary
         """
-        return pd.DataFrame(self.meta)
+        return self.recorder.get_data()
 
     def get_battery_capacity(self):
         """
@@ -113,7 +114,7 @@ class BatterySimple(object):
                 p_acc   = 0
                 p_rej   = -p
             elif st in ['Operational', 'Depleted']:
-                if self.signal == 'buffer-grid':
+                if self.mode == 'buffer-grid':
                     upper_boundary = self.min_max_SOC[1]
                     if soc >= upper_boundary:
                         Q       = c*soc/100 - p*h*(100-soc)/(100-upper_boundary)
@@ -123,7 +124,7 @@ class BatterySimple(object):
                         Q       = c*soc/100 - p*h
                         p_acc   = p
                         p_rej   = 0
-                elif self.signal == 'self-consumption':
+                elif self.mode == 'self-consumption':
                     Q       = c*soc/100 - p*h
                     p_acc   = p
                     p_rej   = 0
@@ -133,7 +134,7 @@ class BatterySimple(object):
                 p_acc   = 0
                 p_rej   = -p
             elif st in ['Operational', 'Fully charged']:
-                if self.signal == 'buffer-grid':
+                if self.mode == 'buffer-grid':
                     lower_boundary = self.min_max_SOC[0]
                     if soc <= lower_boundary:
                         Q       = c*soc/100 - p*h*(soc/lower_boundary)
@@ -143,7 +144,7 @@ class BatterySimple(object):
                         Q       = c*soc/100 - p*h
                         p_acc   = p
                         p_rej   = 0
-                elif self.signal == 'self-consumption':
+                elif self.mode == 'self-consumption':
                     Q       = c*soc/100 - p*h
                     p_acc   = p
                     p_rej   = 0
@@ -157,8 +158,8 @@ class BatterySimple(object):
     def process(self, p_kw, timestep):
 
         """
-        Populates an object's meta dictionary with data comming from the
-        power flow through the battery after BMS filtering
+        Populates an object's recorder meta dictionary with data comming from
+        the power flow through the battery after BMS filtering
         """
         self.p_kw               = p_kw
         h                       = timestep/3600
@@ -168,41 +169,49 @@ class BatterySimple(object):
         if p_acc > 0: # discharge battery
             if Q < 0:
                 self.state = 'Depleted'
-                self.meta['p_reject'].append(Q/h)          # rejected negative power (negative for grid)
-                self.meta['P'].append((c*soc/100)/h)
-                self.meta['battery_SOC'].append(0)
-                self.meta['log'].append('discharged, depleted')
+                self.recorder.record(
+                                    p_reject    = Q/h,      # rejected negative power (negative for grid)
+                                    P           = (c*soc/100)/h,
+                                    battery_SOC = 0,
+                                    log         = 'discharged, depleted',
+                                    )
             elif Q >= 0:
                 self.state = 'Operational'
-                self.meta['p_reject'].append(p_rej)
-                self.meta['P'].append(p_acc)
-                self.meta['battery_SOC'].append(Q/c*100)
-                self.meta['log'].append('discharging')
-
+                self.recorder.record(
+                                    p_reject    = p_rej,    # rejected negative power (negative for grid)
+                                    P           = p_acc,
+                                    battery_SOC = Q/c*100,
+                                    log         = 'discharging',
+                                    )
         elif p_acc < 0: # charge battery
             if Q > c:
                 self.state = 'Fully charged'
-                self.meta['p_reject'].append((Q-c)/h)      # rejected positive power (positive for grid)
-                self.meta['P'].append(-c*(1-soc/100)/h)    # accepted negative power (charge)
-                self.meta['battery_SOC'].append(100)
-                self.meta['log'].append('charged, fully charged')
+                self.recorder.record(
+                                    p_reject    = (Q-c)/h,          # rejected positive power (positive for grid)
+                                    P           = -c*(1-soc/100)/h, # accepted negative power (charge)
+                                    battery_SOC = 100,
+                                    log         = 'charged, fully charged',
+                                    )
             elif Q <= c:
                 self.state = 'Operational'
-                self.meta['p_reject'].append(p_rej)
-                self.meta['P'].append(p_acc)
-                self.meta['battery_SOC'].append(Q/c*100)
-                self.meta['log'].append('charging')
-
+                self.recorder.record(
+                                    p_reject    = p_rej,      # rejected positive power (positive for grid)
+                                    P           = p_acc,      # accepted negative power (charge)
+                                    battery_SOC = Q/c*100,
+                                    log         = 'charging',
+                                    )
         elif not p_acc: # no flow in/out battery
-            self.meta['battery_SOC'].append(soc)
-            self.meta['p_reject'].append(p_rej)
-            self.meta['P'].append(p_acc)
-            self.meta['log'].append('No power flow through battery')
+            self.recorder.record(
+                                p_reject    = p_rej,      # rejected positive power (positive for grid)
+                                P           = p_acc,      # accepted negative power (charge)
+                                battery_SOC = soc,
+                                log         = 'No power flow through battery',
+                                )
 
 class Battery(object):
 
     state       = 'Stand-by'
-    signal      = 'self-consumption'
+    mode      = 'self-consumption'
     overload    = False # boolean
     p_kw        = None  # float
 
@@ -222,14 +231,15 @@ class Battery(object):
         self.dco                = dco               # discharge cut-off [V]
         self.cco                = cco               # charge cut-off [V]
         self.max_c_rate         = max_c_rate        # determines max allowed current
-        self.meta               = {'P'              : [], # Store Power accepted by battery [kW]
-                                   'p_reject'       : [], # Store Power rejected by battery [kW]
-                                   'Q'              : [], # Store charge of cell [Ah]
-                                   'V1'             : [], # Store voltage of RC-1st of cell [V]
-                                   'V2'             : [], # Store voltage of RC-2nd of cell [V]
-                                   'Vcell'          : [], # Store cell voltage [V]
-                                   'battery_SOC'    : [], # Store cell SOC [%]
-                                   }
+        self.recorder           = Recorder(
+                                    'P',            # Store Power accepted by battery [kW]
+                                    'p_reject',     # Store Power rejected by battery [kW]
+                                    'Q',            # Store charge of cell [Ah]
+                                    'V1',           # Store voltage of RC-1st of cell [V]
+                                    'V2',           # Store voltage of RC-2nd of cell [V]
+                                    'Vcell',        # Store cell voltage [V]
+                                    'battery_SOC',  # Store cell SOC [%]
+                                    )
         
         self.ncells = self.battery_capacity/(self.cn*self.vn)*1000 # number of cells in battery pack
 
@@ -266,10 +276,10 @@ class Battery(object):
     # =========================================================================
 
     def get_battery_soc(self):
-        if not self.meta['battery_SOC']:
+        if not self.recorder.meta['battery_SOC']:
             return self.initial_SOC
         else:
-            return self.meta['battery_SOC'][-1]
+            return self.recorder.meta['battery_SOC'][-1]
 
     def get_battery_state(self):
         if self.get_battery_soc() == 100:
@@ -286,10 +296,10 @@ class Battery(object):
                 return self.state
 
     def set_battery_mode(self, mode):
-        self.signal = mode
+        self.mode = mode
 
-    def get_battery_current_signal(self):
-        return self.signal
+    def get_battery_current_mode(self):
+        return self.mode
 
     def get_battery_cell_capacity(self):
         return self.cn
@@ -310,7 +320,7 @@ class Battery(object):
         self.battery_capacity = c
 
     def get_battery_data(self):
-        return pd.DataFrame(self.meta)
+        return self.recorder.get_data()
 
     def get_battery_number_of_li_ion_cells(self):
         if not isinstance(self.ncells, int):
@@ -325,7 +335,7 @@ class Battery(object):
         Battery Management System. Defines safety operation of battery
         charge and discharge
 
-        p_w (float):   power demand/supply. External signal
+        p_w (float):   power demand/supply. External mode
         v_cell (float): cell voltage
 
         Returns cell active power In/Out
@@ -339,7 +349,7 @@ class Battery(object):
                 p_rej = -p_w
             elif st in ['Operational', 'Depleted', 'Stand-by']:
                 self.state = 'Operational'
-                if self.signal == 'buffer-grid':
+                if self.mode == 'buffer-grid':
                     upper_boundary = self.min_max_SOC[1]
                     if soc >= upper_boundary and soc < 100:
                         p_acc = p_w/num_cells * (100-soc)/(100-upper_boundary)
@@ -351,7 +361,7 @@ class Battery(object):
                     else:
                         p_acc = p_w/num_cells
                         p_rej = 0   
-                elif self.signal == 'self-consumption':
+                elif self.mode == 'self-consumption':
                     if soc < 100:
                         p_acc = p_w/num_cells
                         p_rej = 0
@@ -365,7 +375,7 @@ class Battery(object):
                 p_rej = -p_w
             elif st in ['Operational', 'Fully charged', 'Stand-by']:
                 self.state = 'Operational'
-                if self.signal == 'buffer-grid':
+                if self.mode == 'buffer-grid':
                     lower_boundary = self.min_max_SOC[0]
                     if soc <= lower_boundary and soc > 0:
                         p_acc = p_w/num_cells * (soc/lower_boundary)
@@ -377,7 +387,7 @@ class Battery(object):
                     else:
                         p_acc = p_w/num_cells
                         p_rej = 0
-                elif self.signal == 'self-consumption':
+                elif self.mode == 'self-consumption':
                     if soc > 0:
                         p_acc = p_w/num_cells
                         p_rej = 0
@@ -462,22 +472,22 @@ class Battery(object):
         rs = 0.078          # Serial resistance [Ohm]: ohmic resistance of cell
         t  = np.linspace(1, timestep, timestep)
 
-        if not self.meta['battery_SOC']:
+        if not self.recorder.meta['battery_SOC']:
             Qo     = self.cn*self.get_battery_soc()/100 * 3600      # initial condition for Q
             v_cell = self.cco
         else:
-            Qo     = self.meta['Q'][-1]
+            Qo     = self.recorder.meta['Q'][-1]
         if self.state == 'Stand-by':
             v1o    = 0                   # initial condition for V1
             v2o    = 0                   # initial condition for V2
-            if not self.meta['battery_SOC']:
+            if not self.recorder.meta['battery_SOC']:
                 v_cell = self.cco - (1.2 - Qo/(self.cn * 3600))
             else:
                 v_cell = self.meta['Vcell'][-1]
         else:
-            v1o    = self.meta['V1'][-1] # initial condition for V1
-            v2o    = self.meta['V2'][-1] # initial condition for V2
-            v_cell = self.meta['Vcell'][-1]
+            v1o    = self.recorder.meta['V1'][-1] # initial condition for V1
+            v2o    = self.recorder.meta['V2'][-1] # initial condition for V2
+            v_cell = self.recorder.meta['Vcell'][-1]
 
         p_w             = p_kw*1000
         p_acc, p_rej    = self.bms(v_cell, p_w, Qo)
@@ -513,10 +523,11 @@ class Battery(object):
             v2t     = [0]
             soct    = [0.]
         # Store data
-        self.meta['P'].append(sec/timestep*p_acc*self.ncells/1000)
-        self.meta['p_reject'].append(p_acc/1000*(1-sec/timestep) + p_rej/1000)
-        self.meta['Q'].append(Qt[-1])
-        self.meta['V1'].append(v1t[-1])
-        self.meta['V2'].append(v2t[-1])
-        self.meta['Vcell'].append(v_cell[-1])
-        self.meta['battery_SOC'].append(soct[-1]*100)
+        self.recorder.record(P              = sec/timestep*p_acc*self.ncells/1000,
+                             p_reject       = -p_acc/1000*(1-sec/timestep) + p_rej/1000,
+                             Q              = Qt[-1],
+                             V1             = v1t[-1],
+                             V2             = v2t[-1],
+                             Vcell          = v_cell[-1],
+                             battery_SOC    = soct[-1]*100,
+                            )
