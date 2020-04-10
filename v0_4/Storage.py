@@ -524,7 +524,7 @@ class Battery(object):
             soct    = [0.]
         # Store data
         self.recorder.record(P              = sec/timestep*p_acc*self.ncells/1000,
-                             p_reject       = p_acc/1000*(1-sec/timestep) + p_rej/1000,
+                             p_reject       = -p_acc/1000*(1-sec/timestep) + p_rej/1000,
                              Q              = Qt[-1],
                              V1             = v1t[-1],
                              V2             = v2t[-1],
