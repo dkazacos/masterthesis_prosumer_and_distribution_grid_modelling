@@ -47,7 +47,7 @@ class SolarPanel(object):
         float
             power production yielded by a single solar panel in kWh
         """
-        p_sun_wh = irradiance * self.module_area * self.num_panels
+        p_sun_wh = irradiance * self.module_area
         p_sun_kw = p_sun_wh / timestep * 3.6
         if p_sun_kw > self.panel_peak_p:
             p_prod = self.panel_peak_p
