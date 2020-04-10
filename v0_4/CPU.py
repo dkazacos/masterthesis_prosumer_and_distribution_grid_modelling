@@ -7,14 +7,13 @@ Created on Sat Feb 29 20:13:35 2020
 import sys
 sys.path.append('..')
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 from utils.function_repo import timegrid, parse_hours
 from Storage import BatterySimple, Battery
 from PVgen import PVgen
 from recorder import Recorder
 
-class CPU(object):
+class Prosumer(object):
 
     """
     Control process unit allows for data transfer throughout the prosumer
@@ -25,53 +24,14 @@ class CPU(object):
 
     Parameters
     ----------
-    b_type : str, default 'linear'
-        type of battery to be used by the simulation. 
-        'linear' battery is an instance of BatterySimple class.
-        'phys' battery is an instance of a more advanced physical model of a
-        battery. An instance of the class Battery from Storage.py module
+    pvgen: object, default None
+        instance of class PVgen which can be fully characterized by its own
+        default attributes. See documentation
 
-    switch_b : int, default None
-        switch that bypasses the battery. 0 or 1 for closed or opened
-
-    switch_pv : int, default None
-        switch that bypasses the PV installation. 0 or 1 for closed or opened
-
-    battery_capacity: float, default 7.5 kWh
-        capacity of the battery in kWh
-
-    initial_SOC : float, default 100
-        initial state of charge of battery at beginning of simulation
-        in percentage
-
-    min_max_SOC : tuple/list/array, default (0, 100)
-        limits for state of charge of battery outside which conditions of
-        battery_mode 'buffer-grid' apply. This conditions will only affect to the
-        model performance in case battery_mode is explicitly set to 'buffer-grid'.
-        Interval is measured in percentage of the SOC at which to start
-        applying the mentioned conditions
-
-    installed_pv : float, default None
-        installed peak power mounted on roof top in kW
-
-    num_panels : int default None
-        number of solar panels mounted on roof top. Need
-
-    panel_peak_p : float, default 0.3
-        rated power of a single solar panel in kW
-
-    pv_eff : float, default 0.18
-        efficiency of single solar panel
-
-    roof_area : float, default None
-        available roof area to mount PV installation
-
-    total_loss : float, default 0.0035
-        total loss due to cable transmission
-
-    module_area : float, default 1.96 m2
-        area of a single solar panel
-
+    battery: object, dafault None
+        instance of a class BatterySimple or Battery that can be fully
+        characterized by its own default attributes. See documentation
+    
     Return
     ----------
 
@@ -87,9 +47,9 @@ class CPU(object):
                 battery,
                 ):
 
-        self.battery = battery
-        self.pvgen  = pvgen
-        self.recorder = Recorder(
+        self.battery    = battery
+        self.pvgen      = pvgen
+        self.recorder   = Recorder(
                                 'timestamp',
                                 'p_load',
                                 'p_pv',
@@ -101,7 +61,7 @@ class CPU(object):
                                 'log',
                                 )
 
-    def get_cpu_data(self):
+    def get_prosumer_data(self):
         """
         Returns pandas dataframe composed by object's recorder meta dictionary
         of data
@@ -213,7 +173,7 @@ class CPU(object):
     def run_static_sim(self, irrad_data, load_data, timestep):
         """
         Runs the data transfer at every timestamp of the simulation. This
-        method calls CPU's control and runs throughout full length load
+        method calls Prosumer's control and runs throughout full length load
         demanad and irradiation data statically
         
         Parameters
@@ -241,7 +201,7 @@ class CPU(object):
     def run_pflow(self, irrad_data, load_data, timestep, timestamp):
         """
         Runs the data transfer at a given timestamp of the simulation. This
-        method calls CPU's control in a discrete fashion and allows for
+        method calls Prosumer's control in a discrete fashion and allows for
         breaking and continuing the process given external battery_modes
         
         Parameters
@@ -311,7 +271,7 @@ if __name__ == "__main__":
             #                     min_max_SOC         = (20,80),
             #                     )
             }
-    prosumer = CPU(
+    prosumer = Prosumer(
                 **META,
                 )
     # prosumer.set_pvgen_strategy('curtailment')
@@ -340,9 +300,9 @@ if __name__ == "__main__":
     #                     )
 
     prosumer_dict = {}
-    prosumer_dict['res_simp'] = prosumer.get_cpu_data()
+    prosumer_dict['res_simp'] = prosumer.get_prosumer_data()
     prosumer_dict['res_simp'].set_index('timestamp', inplace=True)
-    # prosumer_dict['res_phys'] = pphys.get_cpu_data()
+    # prosumer_dict['res_phys'] = pphys.get_prosumer_data()
 
     # ========================================================================
     # Show some results
