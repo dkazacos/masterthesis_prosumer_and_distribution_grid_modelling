@@ -14,7 +14,7 @@ from Storage import BatterySimple, Battery
 from PVgen import PVgen
 from recorder import Recorder
 
-class CPU(BatterySimple, PVgen):
+class CPU(object):
 
     """
     Control process unit allows for data transfer throughout the prosumer
