@@ -33,6 +33,11 @@ class SolarPanel(object):
     def get_module_area(self):
         return self.module_area
 
+    def get_panel_specs(self):
+        print('Panel peak power', self.panel_peak_p,
+              'Panel area', self.module_area,
+              'Panel efficiency', self.pv_efficiency)
+
     def production(self, irradiance, timestep):
         """
         irradiance : float, default None
