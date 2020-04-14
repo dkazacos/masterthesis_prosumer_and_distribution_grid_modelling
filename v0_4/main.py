@@ -10,7 +10,9 @@ sys.path.append('..')
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from CPU import CPU
+from CPU import Prosumer
+from PVgen import PVgen
+from Storage import BatterySimple, Battery
 from utils.function_repo import parse_hours, timegrid
 
 # ========================================================================
@@ -45,21 +47,22 @@ if any(',' in string for string in load_demand):
 
 # ========================================================================
 # Test model and get results
-META = {
-        'installed_pv'      : 2.1,
-        'battery_capacity'  : 3.5,
-        'initial_SOC'       : 75,
-        'min_max_SOC'       : (20, 80)
-        }
-psimp = CPU(
-            b_type          = 'linear',
-            **META,
-            )
+pvgen = PVgen(installed_pv = 2.1)
+battery = BatterySimple(battery_capacity = 3.5,
+                        initial_SOC = 75,
+                        min_max_SOC = (20,80))
+psimp = Prosumer(
+                pvgen = pvgen,
+                battery = battery,
+                )
 
-# pphys = CPU(
-#             b_type = 'phys',
-#             **META,
-#             )
+# batterycomplex = Battery(battery_capacity = 3.5,
+#                         initial_SOC = 75,
+#                         min_max_SOC = (20,80))
+# psimp = Prosumer(
+                # pvgen = pvgen,
+                # battery = batterycomplex,
+                # )
 
 # psimp.run_static_sim(
 #                   irrad_data = irrad_data,
@@ -82,7 +85,7 @@ for i, (irr, ld) in enumerate(zip(irrad_data, load_demand)):
 prosumer_dict = {}
 prosumer_dict['res_simp'] = psimp.get_cpu_data()
 prosumer_dict['res_simp'].set_index('timestamp', inplace=True)
-# prosumer_dict['res_phys'] = pphys.get_cpu_data()
+# prosumer_dict['res_compl'] = psimp.get_cpu_data()
 
 # ========================================================================
 # Show some results
