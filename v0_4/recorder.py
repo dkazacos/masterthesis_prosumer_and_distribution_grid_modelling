@@ -20,7 +20,7 @@ class Recorder(object):
     def get_data(self):
          return pd.DataFrame(self.meta)
 
-    def last_ocurrence(self, with_name=False):
+    def last_occurrence(self, with_name=False):
         """
         Returns a list with the last ocurrence recorded in a recorder
         meta dictionaty
