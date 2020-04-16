@@ -18,7 +18,10 @@ import pandas as pd
 import numpy as np
 import time
 
-from v0_4.CPU import CPU
+from v0_4.CPU import Prosumer
+from v0_4.centralcpu import CPU
+from Storage import BatterySimple, BatterySimple
+from PVgen import PVgen
 from utils.function_repo import parse_hours, timegrid
 
 # ============================================================================
@@ -100,15 +103,13 @@ def neighborhood(net):
         # Install a PV power around the magnitude of the peak demand of Prosumer X
         pk = np.max(ld)
         # stantiate a Prosumer X
-        META = {
-                'initial_SOC'       : 60,
-                'installed_pv'      : pk*0.7,
-                'min_max_SOC'       : (20, 80), 
-                'battery_capacity'  : 3.5
-                }
-        p = CPU(**META)
+        pvgen   = PVgen(installed_pv = pk*0.7)
+        battery = BatterySimple(battery_capacity = 3.5,
+                                initial_SOC = 60,
+                                min_max_SOC = (20,80))
+        p = Prosumer(pvgen = pvgen, battery=battery)
         # Store Prosumer X in Neighborhood dictionary
-        neighborhood['Prosumer %s in %s' % (b, net.bus.name[b])] = p
+        neighborhood['%s' % net.bus.name[b]] = p
 
     return neighborhood
 
@@ -134,30 +135,36 @@ timestep = timegrid(load)
 net = simple_net()
 # create neighborhood
 nh = neighborhood(net)
+# create central CPU that monitors and commands prosumers
+cpu = CPU()
 
 now=time.time()
 res = defaultdict(list)
 # Run stepwise simulation extracting load and irradiation
-for i, (ir, ld) in enumerate(zip(irr[1080:1140], load[1080:1140]*10)):
+for i, (ir, ld) in enumerate(zip(irr[:1230], load[:1230]*10)):
     # Instantiate a controller unit for each Prosumer's load
     for j, (key, val) in enumerate(nh.items()):
         d = pd.DataFrame(index=[0])
         # Randomly generate a variation of a prosumer load within +/- 30 %
         ld = ld*(1-random.randint(1,30)/1000)
-        val.run_pflow(ir, ld, timestep, timestamp=irr[1080:1140].index[i])
-        d[key] = -val.meta['p_grid_flow'][-1]/1000
-        ds = ts.DFData(d)
-        control.ConstControl(net, element='load',
-                             element_index=[j],
-                             variable='p_mw',  data_source=ds,
-                             profile_name=[key])
-
+        val.run_pflow(ir, ld, timestep, timestamp=irr[:1440].index[i])
+        net.load.at[j, "p_mw"] = -val.recorder.meta['p_grid_flow'][-1]/1000
+        # d[key] = -val.recorder.meta['p_grid_flow'][-1]/1000
+        # ds = ts.DFData(d)
+        # control.ConstControl(net, element='load',
+        #                       element_index=[j],
+        #                       variable='p_mw',  data_source=ds,
+        #                       profile_name=[key])
+        print("net_load",net.load.loc[j,"p_mw"], "pros_SOC", val.recorder.meta['battery_SOC'][-1])
     # Run power flow calculation at every timestep iteration
-    ow = create_output_writer(net,[], "E:/Temp")
-    ts.run_timeseries(net, verbose=False)
-
+    # ow = create_output_writer(net,[], "E:/Temp")
+    # ts.run_timeseries(net, verbose=False)
+    pp.runpp(net)
+    cpu.control_prosumers(net, nh)
     # Store line overload, voltage at buses and slack power balance
     res['Time'].append(irr.index[i])
+    res['load'].append(net.load.p_mw.tolist())
+    res['load_real'].append(load)
     res['th_overload'].append(net.res_line.loading_percent.tolist())
     res['vm_pu_bus'].append(net.res_bus.vm_pu.tolist())
     res['slack_p'].append(net.res_ext_grid.p_mw.tolist())
