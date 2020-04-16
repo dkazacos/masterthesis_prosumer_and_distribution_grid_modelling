@@ -30,11 +30,7 @@ class Recorder(object):
             element is the id of the recorder variable and whose second
             element is the value itself
         """
-        l = []
-        if with_name:
-            for key, val in self.meta.items():
-                l.append((key, val[-1]))
-        elif not with_name:
-            for key, val in self.meta.items():
-                l.append(val[-1])
-        return l
+        d = {}
+        for key, val in self.meta.items():
+            d[key] = val[-1]
+        return d
