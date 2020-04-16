@@ -34,8 +34,7 @@ class Recorder(object):
         if with_name:
             for key, val in self.meta.items():
                 l.append((key, val[-1]))
-        else:
-            if with_name:
+        elif with_name:
             for key, val in self.meta.items():
                 l.append(val[-1])
         return l
