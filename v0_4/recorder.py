@@ -19,3 +19,23 @@ class Recorder(object):
 
     def get_data(self):
          return pd.DataFrame(self.meta)
+
+    def last_ocurrence(self, with_name=False):
+        """
+        Returns a list with the last ocurrence recorded in a recorder
+        meta dictionaty
+        
+        with_name : bool, default False
+            if True, the output list is composed of tuples whose first
+            element is the id of the recorder variable and whose second
+            element is the value itself
+        """
+        l = []
+        if with_name:
+            for key, val in self.meta.items():
+                l.append((key, val[-1]))
+        else:
+            if with_name:
+            for key, val in self.meta.items():
+                l.append(val[-1])
+        return l
