@@ -5,7 +5,7 @@ Created on Tue Apr 14 20:21:57 2020
 @author: Seta
 """
 
-from v0_4.recorder import Recorder
+from v0_5.recorder import Recorder
 
 class CPU(object):
     """
