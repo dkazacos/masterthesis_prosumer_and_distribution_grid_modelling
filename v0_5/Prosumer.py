@@ -307,27 +307,63 @@ if __name__ == "__main__":
     # ========================================================================
     # Show some results
     for val in prosumer_dict.values():
-        fig, ax = plt.subplots(figsize=(12,12))
-
-        ax.plot(val.p_load[720:960], 'orange', label='load')
-        ax.plot(val.p_pv[720:960], 'r', label='pv')
-        ax.plot(val.p_battery_flow[720:960], 'g', label='batt')
-        ax.plot(val.p_grid_flow[720:960], 'b', label='grid')
-        # start, end = ax.get_xlim()
-        # ax.xaxis.set_ticks(np.arange(start, end, 15))
-        # fig.autofmt_xdate()
-        ax.legend()
-        plt.title('Power flow during 1st simulated day', fontsize=18)
-
-    # for val in prosumer_dict.values():
-        fig, ax = plt.subplots(figsize=(12,12))
-
-        ax.plot(val.p_load[270:510], 'orange', label='load')
-        ax.plot(val.p_pv[270:510], 'r', label='pv')
-        ax.plot(val.p_battery_flow[270:510], 'g', label='batt')
-        ax.plot(val.p_grid_flow[270:510], 'b', label='grid')
-        # start, end = ax.get_xlim()
-        # ax.xaxis.set_ticks(np.arange(start, end, 10))
-        # fig.autofmt_xdate()
-        ax.legend()
-        plt.title('Power flow during 1st simulated day', fontsize=18)
+        
+        fig, ax1 = plt.subplots(figsize=(12,12))
+    
+        ln1 = ax1.plot(val.p_load[:480], 'orange', label='load')
+        ln2 = ax1.plot(val.p_pv[:480], 'r', label='pv')
+        ln3 = ax1.plot(val.p_battery_flow[:480], 'g', label='batt')
+        ln4 = ax1.plot(val.p_grid_flow[:480], 'b', label='grid')
+        ax2 = ax1.twinx()
+        ln5 = ax2.plot(val.battery_SOC[:480], 'black', label='SOC')
+        lns = ln1+ln2+ln3+ln4+ln5
+        labs = [l.get_label() for l in lns]
+        ax1.legend(lns, labs)
+    
+        ax1.grid()
+        ax1.set_xlabel('Time', fontsize=14)
+        ax1.set_ylabel('Power flow (kW)', fontsize=14)
+        ax2.set_ylabel('Battery SOC', color='black', fontsize=14)  # we already handled the x-label with ax1
+        ax2.set_ylim(0,120)
+        # plt.title('Power flow during 1st simulated day', fontsize=18)
+        fig.tight_layout()
+        
+        fig, ax1 = plt.subplots(figsize=(12,12))
+    
+        ln1 = ax1.plot(val.p_load[480:960], 'orange', label='load')
+        ln2 = ax1.plot(val.p_pv[480:960], 'r', label='pv')
+        ln3 = ax1.plot(val.p_battery_flow[480:960], 'g', label='batt')
+        ln4 = ax1.plot(val.p_grid_flow[480:960], 'b', label='grid')
+        ax2 = ax1.twinx()
+        ln5 = ax2.plot(val.battery_SOC[480:960], 'black', label='SOC')
+        lns = ln1+ln2+ln3+ln4+ln5
+        labs = [l.get_label() for l in lns]
+        ax1.legend(lns, labs)
+    
+        ax1.grid()
+        ax1.set_xlabel('Time', fontsize=14)
+        ax1.set_ylabel('Power flow (kW)', fontsize=14)
+        ax2.set_ylabel('Battery SOC', color='black', fontsize=14)  # we already handled the x-label with ax1
+        ax2.set_ylim(0,120)
+        # plt.title('Power flow during 1st simulated day', fontsize=18)
+        fig.tight_layout()
+    
+        fig, ax1 = plt.subplots(figsize=(12,12))
+    
+        ln1 = ax1.plot(val.p_load[960:1440], 'orange', label='load')
+        ln2 = ax1.plot(val.p_pv[960:1440], 'r', label='pv')
+        ln3 = ax1.plot(val.p_battery_flow[960:1440], 'g', label='batt')
+        ln4 = ax1.plot(val.p_grid_flow[960:1440], 'b', label='grid')
+        ax2 = ax1.twinx()
+        ln5 = ax2.plot(val.battery_SOC[960:1440], 'black', label='SOC')
+        lns = ln1+ln2+ln3+ln4+ln5
+        labs = [l.get_label() for l in lns]
+        ax1.legend(lns, labs)
+    
+        ax1.grid()
+        ax1.set_xlabel('Time', fontsize=14)
+        ax1.set_ylabel('Power flow (kW)', fontsize=14)
+        ax2.set_ylabel('Battery SOC', color='black', fontsize=14)  # we already handled the x-label with ax1
+        ax2.set_ylim(0,120)
+        # plt.title('Power flow during 1st simulated day', fontsize=18)
+        fig.tight_layout()
