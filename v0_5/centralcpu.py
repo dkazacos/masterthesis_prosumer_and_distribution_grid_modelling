@@ -25,18 +25,30 @@ class CPU(object):
                                  )
 
     def check_overvoltage(self, net):
+        """
+        CPU Recorder records 1, if overvoltage is found at any bus of
+        any line, or 0, if no overvoltage is found
+        """
         if not net.res_bus.query('vm_pu >= 1.03').vm_pu.any():
             self.recorder.record(overvoltage=0)
         else:
             self.recorder.record(overvoltage=1)
 
     def check_undervoltage(self, net):
+        """
+        CPU Recorder records 1, if undervoltage is found at any bus of
+        any line, or 0, if no undervoltage is found
+        """
         if not net.res_bus.query('vm_pu <= 0.97').vm_pu.any():
             self.recorder.record(undervoltage=0)
         else:
             self.recorder.record(undervoltage=1)
 
     def check_thermal_overload(self, net):
+        """
+        CPU Recorder records 1, if thermal overload is found at any line,
+        or 0, if no thermal overload is found
+        """
         if not net.res_line.query('loading_percent >= 0.8').loading_percent.any():
             self.recorder.record(thermal_overload=0)
         else:
@@ -46,6 +58,13 @@ class CPU(object):
         self.recorder.record(slack_power=0)
 
     def risk_identifier(self, net, flags):
+        """
+        If any operational risk is identified in any line or bus,
+        this function will return a dictionary with identified
+        responsible buses
+        
+        This ditionary will be empty otherwise
+        """
 
         risks = {}
         if flags['overvoltage']:
@@ -72,9 +91,18 @@ class CPU(object):
         return risks
 
     def prosumers_to_intervene(self, neighborhood, bus_names):
+        """
+        Returns a list of prosumers at the identified buses where
+        riks operation is present
+        """
         return list(set(neighborhood.keys()).intersection(set(bus_names)))
 
     def switch_behavior(self, risk, neighborhood, prosumers):
+        """
+        Commands each prosumer connected to the buses where risky operation
+        has been found to switch their behavior in order to better operate
+        the grid
+        """
         if risk == 'overvoltage':
             for p in prosumers:
                 neighborhood[p].battery_mode = 'self-consumption' # or 'buffer-grid' with min_max_SOC = (0, 80) or (0, 75) from beforehand. min_SOC=0 to allow full discharge of battery without penalizatin
@@ -89,6 +117,10 @@ class CPU(object):
                 neighborhood[p].pv_strategy = 'curtailment' # avoid feed-in
 
     def check_net(self, net):
+        """
+        Returns a binary list of the las occurrence with 1 or 0 whether
+        a certain operational risk is found or not
+        """
         self.check_overvoltage(net)
         self.check_undervoltage(net)
         self.check_thermal_overload(net)
@@ -97,6 +129,10 @@ class CPU(object):
         return self.recorder.last_occurrence()
 
     def control_prosumers(self, net, neighbodhood):
+        """
+        Main function to be called from the outside. This function allows
+        the control of prosumers to happen
+        """
         flags = self.check_net(net)
         risks = self.risk_identifier(net, flags)
         for key, val in risks.items():
