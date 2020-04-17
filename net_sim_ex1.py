@@ -18,8 +18,8 @@ import pandas as pd
 import numpy as np
 import time
 
-from v0_4.CPU import Prosumer
-from v0_4.centralcpu import CPU
+from v0_5.CPU import Prosumer
+from v0_5.centralcpu import CPU
 from Storage import BatterySimple, BatterySimple
 from PVgen import PVgen
 from utils.function_repo import parse_hours, timegrid
