@@ -18,7 +18,7 @@ import pandas as pd
 import numpy as np
 import time
 
-from v0_5.CPU import Prosumer
+from v0_5.Prosumer import Prosumer
 from v0_5.centralcpu import CPU
 from Storage import BatterySimple, BatterySimple
 from PVgen import PVgen
@@ -155,12 +155,12 @@ for i, (ir, ld) in enumerate(zip(irr[:1230], load[:1230]*10)):
         #                       element_index=[j],
         #                       variable='p_mw',  data_source=ds,
         #                       profile_name=[key])
-        print("net_load",net.load.loc[j,"p_mw"], "pros_SOC", val.recorder.meta['battery_SOC'][-1])
+        # print("net_load",net.load.loc[j,"p_mw"], "pros_SOC", val.recorder.meta['battery_SOC'][-1])
     # Run power flow calculation at every timestep iteration
     # ow = create_output_writer(net,[], "E:/Temp")
     # ts.run_timeseries(net, verbose=False)
     pp.runpp(net)
-    cpu.control_prosumers(net, nh)
+    cpu.control_prosumers(net, nh, bypass_control=False)
     # Store line overload, voltage at buses and slack power balance
     res['Time'].append(irr.index[i])
     res['load'].append(net.load.p_mw.tolist())
