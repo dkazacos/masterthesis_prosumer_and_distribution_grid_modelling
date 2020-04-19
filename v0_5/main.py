@@ -55,7 +55,8 @@ psimp = Prosumer(
                 pvgen = pvgen,
                 battery = battery,
                 )
-
+psimp.set_pvgen_strategy('curtailment')
+psimp.set_battery_mode('buffer-grid')
 # batterycomplex = Battery(battery_capacity = 3.5,
 #                         initial_SOC = 75,
 #                         min_max_SOC = (20,80))
@@ -73,7 +74,7 @@ timestep = timegrid(irrad_data)
 for i, (irr, ld) in enumerate(zip(irrad_data, load_demand)):
     psimp.run_pflow(
                     irrad_data  = irr,
-                    load_data   = ld,
+                    load_data   = ld*3,
                     timestep    = timestep,
                     timestamp   = load_demand.index[i],
                     )
@@ -89,64 +90,71 @@ prosumer_dict['res_simp'].set_index('timestamp', inplace=True)
 
 # ========================================================================
 # Show some results
+path = 'E:/Temp/'
 for val in prosumer_dict.values():
     
-    fig, ax1 = plt.subplots(figsize=(12,12))
+    fig, ax1 = plt.subplots(figsize=(36,12))
 
-    ln1 = ax1.plot(val.p_load[:480], 'orange', label='load')
-    ln2 = ax1.plot(val.p_pv[:480], 'r', label='pv')
-    ln3 = ax1.plot(val.p_battery_flow[:480], 'g', label='batt')
-    ln4 = ax1.plot(val.p_grid_flow[:480], 'b', label='grid')
+    ln1 = ax1.plot(val.p_load[:1440], 'orange', label='load')
+    ln2 = ax1.plot(val.p_pv[:1440], 'r', label='pv')
+    ln3 = ax1.plot(val.p_battery_flow[:1440], 'g', label='batt')
+    ln4 = ax1.plot(val.p_grid_flow[:1440], 'b', label='grid')
     ax2 = ax1.twinx()
-    ln5 = ax2.plot(val.battery_SOC[:480], 'black', label='SOC')
+    ln5 = ax2.plot(val.battery_SOC[:1440], 'black', label='SOC')
     lns = ln1+ln2+ln3+ln4+ln5
     labs = [l.get_label() for l in lns]
     ax1.legend(lns, labs)
 
     ax1.grid()
+    # ax1.set_ylim(-4.5,6.5)
     ax1.set_xlabel('Time', fontsize=14)
     ax1.set_ylabel('Power flow (kW)', fontsize=14)
     ax2.set_ylabel('Battery SOC', color='black', fontsize=14)  # we already handled the x-label with ax1
     ax2.set_ylim(0,120)
-    # plt.title('Power flow during 1st simulated day', fontsize=18)
+    plt.title('PV strategy: %s Battery mode: %s' % (psimp.pv_strategy, psimp.battery_mode), fontsize=16)
     fig.tight_layout()
+    plt.savefig(path+'day PV strategy %s Battery mode %s' % (psimp.pv_strategy, psimp.battery_mode))
     
-    fig, ax1 = plt.subplots(figsize=(12,12))
+    # fig, ax1 = plt.subplots(figsize=(12,12))
 
-    ln1 = ax1.plot(val.p_load[480:960], 'orange', label='load')
-    ln2 = ax1.plot(val.p_pv[480:960], 'r', label='pv')
-    ln3 = ax1.plot(val.p_battery_flow[480:960], 'g', label='batt')
-    ln4 = ax1.plot(val.p_grid_flow[480:960], 'b', label='grid')
-    ax2 = ax1.twinx()
-    ln5 = ax2.plot(val.battery_SOC[480:960], 'black', label='SOC')
-    lns = ln1+ln2+ln3+ln4+ln5
-    labs = [l.get_label() for l in lns]
-    ax1.legend(lns, labs)
+    # ln1 = ax1.plot(val.p_load[480:960], 'orange', label='load')
+    # ln2 = ax1.plot(val.p_pv[480:960], 'r', label='pv')
+    # ln3 = ax1.plot(val.p_battery_flow[480:960], 'g', label='batt')
+    # ln4 = ax1.plot(val.p_grid_flow[480:960], 'b', label='grid')
+    # ax2 = ax1.twinx()
+    # ln5 = ax2.plot(val.battery_SOC[480:960], 'black', label='SOC')
+    # lns = ln1+ln2+ln3+ln4+ln5
+    # labs = [l.get_label() for l in lns]
+    # ax1.legend(lns, labs)
 
-    ax1.grid()
-    ax1.set_xlabel('Time', fontsize=14)
-    ax1.set_ylabel('Power flow (kW)', fontsize=14)
-    ax2.set_ylabel('Battery SOC', color='black', fontsize=14)  # we already handled the x-label with ax1
-    ax2.set_ylim(0,120)
-    # plt.title('Power flow during 1st simulated day', fontsize=18)
-    fig.tight_layout()
+    # ax1.grid()
+    # # ax1.set_ylim(-4.5,6.5)
+    # ax1.set_xlabel('Time', fontsize=14)
+    # ax1.set_ylabel('Power flow (kW)', fontsize=14)
+    # ax2.set_ylabel('Battery SOC', color='black', fontsize=14)  # we already handled the x-label with ax1
+    # ax2.set_ylim(0,120)
+    # plt.title('PV strategy: %s Battery mode: %s' % (psimp.pv_strategy, psimp.battery_mode), fontsize=16)
+    # fig.tight_layout()
+    # plt.savefig(path+'afternoon PV strategy %s Battery mode %s' % (psimp.pv_strategy, psimp.battery_mode))
 
-    fig, ax1 = plt.subplots(figsize=(12,12))
+    # fig, ax1 = plt.subplots(figsize=(12,12))
 
-    ln1 = ax1.plot(val.p_load[960:1440], 'orange', label='load')
-    ln2 = ax1.plot(val.p_pv[960:1440], 'r', label='pv')
-    ln3 = ax1.plot(val.p_battery_flow[960:1440], 'g', label='batt')
-    ln4 = ax1.plot(val.p_grid_flow[960:1440], 'b', label='grid')
-    ax2 = ax1.twinx()
-    ln5 = ax2.plot(val.battery_SOC[960:1440], 'black', label='SOC')
-    lns = ln1+ln2+ln3+ln4+ln5
-    labs = [l.get_label() for l in lns]
-    ax1.legend(lns, labs)
+    # ln1 = ax1.plot(val.p_load[960:1440], 'orange', label='load')
+    # ln2 = ax1.plot(val.p_pv[960:1440], 'r', label='pv')
+    # ln3 = ax1.plot(val.p_battery_flow[960:1440], 'g', label='batt')
+    # ln4 = ax1.plot(val.p_grid_flow[960:1440], 'b', label='grid')
+    # ax2 = ax1.twinx()
+    # ln5 = ax2.plot(val.battery_SOC[960:1440], 'black', label='SOC')
+    # lns = ln1+ln2+ln3+ln4+ln5
+    # labs = [l.get_label() for l in lns]
+    # ax1.legend(lns, labs)
 
-    ax1.grid()
-    ax1.set_xlabel('Time', fontsize=14)
-    ax1.set_ylabel('Power flow (kW)', fontsize=14)
-    ax2.set_ylabel('Battery SOC', color='black', fontsize=14)  # we already handled the x-label with ax1
-    ax2.set_ylim(0,120)
-    # plt.title('Power flow during 1st simulated day', fontsize=18)
-    fig.tight_layout()
+    # ax1.grid()
+    # # ax1.set_ylim(-4.5,6.5)
+    # ax1.set_xlabel('Time', fontsize=14)
+    # ax1.set_ylabel('Power flow (kW)', fontsize=14)
+    # ax2.set_ylabel('Battery SOC', color='black', fontsize=14)  # we already handled the x-label with ax1
+    # ax2.set_ylim(0,120)
+    # plt.title('PV strategy: %s Battery mode: %s' % (psimp.pv_strategy, psimp.battery_mode), fontsize=16)
+    # fig.tight_layout()
+    # plt.savefig(path+'evening PV strategy %s Battery mode %s' % (psimp.pv_strategy, psimp.battery_mode))
