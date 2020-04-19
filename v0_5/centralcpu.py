@@ -57,6 +57,31 @@ class CPU(object):
     def check_slack_bus_power(self, net):
         self.recorder.record(slack_power=0)
 
+    def recursive_net_search(self, net, lines):
+        """
+        Down-stream search for lines attached to buses to which lines
+        found with thermal overload feed
+
+        net : pandapower net object
+
+        lines: list
+            list of lines initially found with thermal overload
+
+        Return
+            extenden lines list with children down-stream lines
+        """
+        buses = net.line.loc[lines, 'to_bus'].tolist()
+        if not set(buses).intersection(net.line['from_bus']):
+            pass
+        else:
+            line_set = [net.line.index[net.line['from_bus']==b] for b in buses]
+            stop = len(lines)
+            lines.extend([item for sublist in line_set for item in sublist if item not in lines])
+            if len(lines) == stop:
+                pass
+            else:
+                return self.recursive_net_search(net, lines)
+
     def risk_identifier(self, net, flags):
         """
         If any operational risk is identified in any line or bus,
@@ -71,22 +96,31 @@ class CPU(object):
             buses = net.res_bus.query('vm_pu >= 1.03').vm_pu.index.tolist()
             ov_in_bus = net.bus.loc[buses, 'name'].tolist()
             risks['overvoltage'] = ov_in_bus
+            # ov_bus_to_default = set(net.bus.index.tolist()).difference([*ov_in_bus])
 
         if flags['undervoltage']:
             buses = net.res_bus.query('vm_pu <= 0.97').vm_pu.index.tolist()
             uv_in_bus = net.bus.loc[buses, 'name'].tolist()
             risks['undervoltage'] = uv_in_bus
+            # uv_bus_to_default = set(net.bus.index.tolist()).difference([*uv_in_bus])
 
         if flags['thermal_overload']:
-            lines = net.res_line.query('loading_percent <= 80').loading_percent.index.tolist()
+            lines = net.res_line.query('loading_percent >= 80').loading_percent.index.tolist()
+            # self.recursive_net_search(net, lines)
             buses = net.line.loc[lines, 'to_bus'].tolist()
-            tho_in_line_to_bus = net.bus.loc[buses, 'name'].tolist()
-            risks['thermal_overload'] = tho_in_line_to_bus
+            tho_due_to_buses = net.bus.loc[buses, 'name'].tolist()
+            risks['thermal_overload'] = tho_due_to_buses
+            # tho_bus_to_default = set(net.bus.index.tolist()).difference([*tho_due_to_buses])
 
         if flags['slack_power']:
             pass
+
         else:
-            pass
+            bus_with_risk = []
+            for _, buses in risks.items():
+                bus_with_risk.append(buses)
+            prosumers_to_default = set(net.load.bus.tolist()).difference(*bus_with_risk)
+            risks['to_default'] = net.bus.loc[prosumers_to_default, 'name'].tolist()
 
         return risks
 
@@ -115,6 +149,10 @@ class CPU(object):
             for p in prosumers:
                 neighborhood[p].battery_mode = 'self-consumption' # allow full charge/discharge without penalization because we need to reduce consumption from grid
                 neighborhood[p].pv_strategy = 'curtailment' # avoid feed-in
+        elif risk == 'to_default':
+            for p in prosumers:
+                neighborhood[p].battery_mode = 'self-consumption' # back to default
+                neighborhood[p].pv_strategy = 'self-consumption' # back to default
 
     def check_net(self, net):
         """
@@ -128,13 +166,24 @@ class CPU(object):
 
         return self.recorder.last_occurrence()
 
-    def control_prosumers(self, net, neighbodhood):
+    # def to_default_behavior(self, net, risks):
+
+    #     bus_with_risk = []
+    #     for key, val in risks.items():
+    #         bus_with_risk.append(val)
+    #     prosumers_to_default = set(net.bus.index.tolist()).difference(*bus_with_risk)
+    #     return list(prosumers_to_default)
+
+    def control_prosumers(self, net, neighbodhood, bypass_control=False):
         """
         Main function to be called from the outside. This function allows
         the control of prosumers to happen
         """
         flags = self.check_net(net)
-        risks = self.risk_identifier(net, flags)
-        for key, val in risks.items():
-            # prosumers = self.prosumers_to_intervene(neighbodhood, val)
-            self.switch_behavior(key, neighbodhood, val)
+        if bypass_control:
+            pass
+        else:
+            risks = self.risk_identifier(net, flags)
+            for risk, prosumers in risks.items():
+                # prosumers = self.prosumers_to_intervene(neighbodhood, val)
+                self.switch_behavior(risk, neighbodhood, prosumers)
