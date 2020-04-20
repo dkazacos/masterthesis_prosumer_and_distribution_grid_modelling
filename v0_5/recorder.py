@@ -34,3 +34,23 @@ class Recorder(object):
         for key, val in self.meta.items():
             d[key] = val[-1]
         return d
+
+class Counter(object):
+    def __init__(self):
+        self.recorder = Recorder()
+
+    def binary_count(self, to_count, value, reset_counter_at):
+        self.recorder.record(to_count = value)
+        if value:
+            self.recorder.meta[to_count] = [1]
+            return True
+        else:
+            if not sum(self.recorder.meta[to_count]):
+                self.recorder.meta[to_count] = []
+                return True
+            elif sum(self.recorder.meta[to_count]) != reset_counter_at:
+                self.recorder.meta[to_count][-1] = 1
+                return False
+            else:
+                self.recorder.meta[to_count] = []
+                return True

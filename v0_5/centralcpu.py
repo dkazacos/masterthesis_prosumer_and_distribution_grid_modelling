@@ -131,6 +131,15 @@ class CPU(object):
         """
         return list(set(neighborhood.keys()).intersection(set(bus_names)))
 
+    def prosumer_persistent_behavior(self, counts):
+        for risk, val in self.recorder.meta.keys():
+            event = self.recorder.meta[risk][-1]
+            access = counter(risk, event, lag)
+            if access:
+                pass
+            else:
+                self.recorder.meta[risk][-1] = 1
+
     def switch_behavior(self, risk, neighborhood, prosumers):
         """
         Commands each prosumer connected to the buses where risky operation
