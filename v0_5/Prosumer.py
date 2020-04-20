@@ -41,6 +41,8 @@ class Prosumer(object):
     battery_mode   = 'self-consumption'   # also: 'buffer-grid' 
     # Strategy is passed to the pv system for consequent operation mode
     pv_strategy = 'self-consumption'   # also: 'full-curtailment', 'partial-curtailment', 'reactive feed-in'
+    # Prosumer activity can be regular or energy saving
+    prosumer_profile = 'self-consumption' # also: energy-saving
 
     def __init__(self,
                 pvgen,
@@ -83,6 +85,9 @@ class Prosumer(object):
         """
         self.pvgen.installed_pv = installed_pv
 
+    def set_prosumer_profile(self, profile):
+        self.prosumer_profile = profile
+
     def set_battery_mode(self, mode):
         self.battery.set_battery_mode(mode)
         self.battery_mode = mode
@@ -123,6 +128,8 @@ class Prosumer(object):
         """        
 
         p_pv    = self.pvgen.production(irr_sun, timestep)
+        if self.prosumer_profile == 'energy-saving':
+            p_load = 0.7 * p_load
         p_flow  = p_load - p_pv
 
         self.battery.process(p_flow, timestep)
@@ -278,6 +285,7 @@ if __name__ == "__main__":
     prosumer.set_pvgen_strategy('self-consumption')
     # prosumer.set_battery_mode('self-consumption')
     prosumer.set_battery_mode('buffer-grid')
+    prosumer.set_prosumer_profile('energy-saving')
 
     timestep = timegrid(irrad_data)
 
