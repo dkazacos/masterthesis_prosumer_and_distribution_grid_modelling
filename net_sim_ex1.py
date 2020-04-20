@@ -139,7 +139,10 @@ nh = neighborhood(net)
 cpu = CPU()
 
 now=time.time()
-res = defaultdict(list)
+t           = []
+th_overload = pd.DataFrame()
+vm_pu       = pd.DataFrame()
+slack_p     = pd.DataFrame()
 # Run stepwise simulation extracting load and irradiation
 for i, (ir, ld) in enumerate(zip(irr[:1230], load[:1230]*10)):
     # Instantiate a controller unit for each Prosumer's load
@@ -162,11 +165,18 @@ for i, (ir, ld) in enumerate(zip(irr[:1230], load[:1230]*10)):
     pp.runpp(net)
     cpu.control_prosumers(net, nh, bypass_control=False)
     # Store line overload, voltage at buses and slack power balance
-    res['Time'].append(irr.index[i])
-    res['load'].append(net.load.p_mw.tolist())
-    res['load_real'].append(load)
-    res['th_overload'].append(net.res_line.loading_percent.tolist())
-    res['vm_pu_bus'].append(net.res_bus.vm_pu.tolist())
-    res['slack_p'].append(net.res_ext_grid.p_mw.tolist())
+    # res['Time'].append(irr.index[i])
+    # res['load'].append(net.load.p_mw.tolist())
+    # res['th_overload'].append(net.res_line.loading_percent.tolist())
+    # res['vm_pu_bus'].append(net.res_bus.vm_pu.tolist())
+    # res['slack_p'].append(net.res_ext_grid.p_mw.tolist())
     # print('Time since beginning of simulation: ', time.time() - now)
-results = pd.DataFrame(res)
+    t.append(irr.index[i])
+    th_overload = th_overload.append(net.res_line.loading_percent.transpose(), ignore_index=True)
+    vm_pu = vm_pu.append(net.res_bus.vm_pu.transpose(), ignore_index=True)
+    slack_p = slack_p.append(net.res_ext_grid.p_mw, ignore_index=True)
+    # print('Time since beginning of simulation: ', time.time() - now)
+th_overload.index = t
+vm_pu.index = t
+slack_p.index = t
+# results = pd.DataFrame(res)

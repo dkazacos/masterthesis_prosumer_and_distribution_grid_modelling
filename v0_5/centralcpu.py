@@ -149,10 +149,12 @@ class CPU(object):
             for p in prosumers:
                 neighborhood[p].battery_mode = 'self-consumption' # allow full charge/discharge without penalization because we need to reduce consumption from grid
                 neighborhood[p].pv_strategy = 'curtailment' # avoid feed-in
+                neighborhood[p].prosumer_profile = 'energy-saving' # back to default
         elif risk == 'to_default':
             for p in prosumers:
                 neighborhood[p].battery_mode = 'self-consumption' # back to default
                 neighborhood[p].pv_strategy = 'self-consumption' # back to default
+                neighborhood[p].prosumer_profile = 'self-consumption' # back to default
 
     def check_net(self, net):
         """
